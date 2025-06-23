@@ -111,7 +111,7 @@ const ProjectOfficerDashboard = () => {
       if (error) throw error;
 
       // Create default phase deadlines
-      const phases = ['phase1', 'phase2', 'phase3', 'phase4'];
+      const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
       const baseDate = new Date();
       
       for (let i = 0; i < phases.length; i++) {

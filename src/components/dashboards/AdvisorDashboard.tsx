@@ -29,6 +29,7 @@ interface Document {
   submitted_at: string;
   project: {
     title: string;
+    student_id: string;
     student: {
       full_name: string;
     };
@@ -69,6 +70,7 @@ const AdvisorDashboard = () => {
           *,
           project:fyp_projects(
             title,
+            student_id,
             student:profiles!student_id(full_name)
           )
         `)
@@ -103,9 +105,9 @@ const AdvisorDashboard = () => {
       
       // Create notification for student
       const doc = pendingDocuments.find(d => d.id === docId);
-      if (doc?.project?.student) {
+      if (doc?.project?.student_id) {
         await supabase.rpc('create_notification', {
-          user_id: doc.project.student.id,
+          user_id: doc.project.student_id,
           title: `Document ${action}`,
           message: `Your ${doc.phase} submission has been ${action}${feedback ? `: ${feedback}` : ''}`
         });
