@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import PhaseDetailView from './PhaseDetailView';
 
 interface Project {
   id: string;
@@ -40,6 +40,7 @@ const StudentDashboard = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -125,6 +126,31 @@ const StudentDashboard = () => {
     return phases[phase as keyof typeof phases] || phase;
   };
 
+  const isPhaseUnlocked = (phase: string) => {
+    const phaseOrder = ['phase1', 'phase2', 'phase3', 'phase4'];
+    const currentPhaseIndex = phaseOrder.indexOf(phase);
+    
+    if (currentPhaseIndex === 0) return true; // Phase 1 is always unlocked
+    
+    // Check if all previous phases are approved
+    for (let i = 0; i < currentPhaseIndex; i++) {
+      const previousPhase = phaseOrder[i];
+      const previousPhaseDoc = documents.find(doc => doc.phase === previousPhase);
+      if (!previousPhaseDoc || previousPhaseDoc.status !== 'approved') {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handlePhaseClick = (phase: string) => {
+    if (isPhaseUnlocked(phase)) {
+      setSelectedPhase(phase);
+    } else {
+      toast.error('Complete previous phases to unlock this phase');
+    }
+  };
+
   if (loading) {
     return <div className="animate-pulse space-y-4">Loading...</div>;
   }
@@ -136,6 +162,18 @@ const StudentDashboard = () => {
         <h3 className="text-lg font-medium text-gray-900 mb-2">No Project Assigned</h3>
         <p className="text-gray-600">You haven't been assigned to any FYP project yet.</p>
       </div>
+    );
+  }
+
+  // Show phase detail view if a phase is selected
+  if (selectedPhase) {
+    return (
+      <PhaseDetailView
+        phase={selectedPhase}
+        projectId={project.id}
+        onBack={() => setSelectedPhase(null)}
+        isLocked={!isPhaseUnlocked(selectedPhase)}
+      />
     );
   }
 
@@ -187,26 +225,52 @@ const StudentDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Upload className="h-5 w-5" />
-              <span>Document Status</span>
+              <span>Project Phases</span>
             </CardTitle>
-            <CardDescription>Track your submissions across all phases</CardDescription>
+            <CardDescription>Click on unlocked phases to manage documents</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {['phase1', 'phase2', 'phase3', 'phase4'].map((phase) => {
                 const doc = documents.find(d => d.phase === phase);
+                const isUnlocked = isPhaseUnlocked(phase);
+                
                 return (
-                  <div key={phase} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div 
+                    key={phase} 
+                    className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                      isUnlocked 
+                        ? 'cursor-pointer hover:bg-gray-50' 
+                        : 'opacity-50 cursor-not-allowed bg-gray-100'
+                    }`}
+                    onClick={() => handlePhaseClick(phase)}
+                  >
                     <div className="flex items-center space-x-3">
-                      {getStatusIcon(doc?.status || 'pending')}
+                      {!isUnlocked ? (
+                        <Lock className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        getStatusIcon(doc?.status || 'pending')
+                      )}
                       <div>
-                        <div className="font-medium text-sm">{getPhaseTitle(phase)}</div>
+                        <div className="font-medium text-sm flex items-center">
+                          {getPhaseTitle(phase)}
+                          {!isUnlocked && <Lock className="h-3 w-3 ml-2 text-gray-400" />}
+                        </div>
                         {doc?.advisor_feedback && doc.status === 'rejected' && (
-                          <div className="text-xs text-red-600 mt-1">{doc.advisor_feedback}</div>
+                          <div className="text-xs text-red-600 mt-1 truncate max-w-xs">
+                            {doc.advisor_feedback}
+                          </div>
                         )}
                       </div>
                     </div>
-                    {getStatusBadge(doc?.status || 'pending')}
+                    <div className="flex items-center space-x-2">
+                      {getStatusBadge(doc?.status || 'pending')}
+                      {isUnlocked && (
+                        <Button variant="ghost" size="sm">
+                          View
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
