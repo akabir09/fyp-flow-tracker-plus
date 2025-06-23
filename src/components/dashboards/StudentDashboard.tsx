@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Calendar, CheckCircle, Clock, AlertTriangle, GraduationCap } from 'lucide-react';
+import { Upload, FileText, Calendar, CheckCircle, Clock, AlertTriangle, AlertCircle, GraduationCap } from 'lucide-react';
 import { format } from 'date-fns';
 import { NotificationService } from '@/services/notificationService';
 
@@ -19,6 +20,7 @@ interface Project {
   title: string;
   description: string;
   status: string;
+  advisor_id: string;
   advisor: {
     full_name: string;
     email: string;
@@ -156,13 +158,15 @@ const StudentDashboard = () => {
 
       if (error) throw error;
 
-      // Send notifications
-      await NotificationService.notifyDocumentSubmission(
-        project.title,
-        documentData.title,
-        profile?.id!,
-        project.advisor_id
-      );
+      // Send notifications - fix the advisor_id reference
+      if (project.advisor_id) {
+        await NotificationService.notifyDocumentSubmission(
+          project.title,
+          documentData.title,
+          profile?.id!,
+          project.advisor_id
+        );
+      }
 
       return document;
     },
