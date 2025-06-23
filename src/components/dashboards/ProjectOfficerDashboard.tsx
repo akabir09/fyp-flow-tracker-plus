@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Users, FileText, Calendar, BarChart3, X } from 'lucide-react';
+import { Plus, Users, FileText, Calendar, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Project {
@@ -47,7 +48,7 @@ const ProjectOfficerDashboard = () => {
     title: '',
     description: '',
     studentId: '',
-    advisorIds: [] as string[]
+    advisorId: ''
   });
 
   useEffect(() => {
@@ -94,17 +95,6 @@ const ProjectOfficerDashboard = () => {
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation for multiselect
-    if (formData.advisorIds.length < 2) {
-      toast.error('Please select at least 2 advisors');
-      return;
-    }
-    
-    if (formData.advisorIds.length > 4) {
-      toast.error('Please select no more than 4 advisors');
-      return;
-    }
-    
     try {
       const { data, error } = await supabase
         .from('fyp_projects')
@@ -112,7 +102,7 @@ const ProjectOfficerDashboard = () => {
           title: formData.title,
           description: formData.description,
           student_id: formData.studentId,
-          advisor_id: formData.advisorIds[0], // Primary advisor
+          advisor_id: formData.advisorId,
           project_officer_id: profile?.id
         })
         .select()
@@ -126,7 +116,7 @@ const ProjectOfficerDashboard = () => {
       
       for (let i = 0; i < phases.length; i++) {
         const deadlineDate = new Date(baseDate);
-        deadlineDate.setMonth(deadlineDate.getMonth() + (i + 1) * 3);
+        deadlineDate.setMonth(deadlineDate.getMonth() + (i + 1) * 3); // 3 months apart
         
         await supabase
           .from('phase_deadlines')
@@ -137,7 +127,7 @@ const ProjectOfficerDashboard = () => {
           });
       }
 
-      // Create notifications for student and all selected advisors
+      // Create notifications for student and advisor
       if (formData.studentId) {
         await supabase.rpc('create_notification', {
           user_id: formData.studentId,
@@ -146,10 +136,9 @@ const ProjectOfficerDashboard = () => {
         });
       }
 
-      // Notify all selected advisors
-      for (const advisorId of formData.advisorIds) {
+      if (formData.advisorId) {
         await supabase.rpc('create_notification', {
-          user_id: advisorId,
+          user_id: formData.advisorId,
           title: 'New Project Assignment',
           message: `You have been assigned as advisor for project: ${formData.title}`
         });
@@ -157,34 +146,12 @@ const ProjectOfficerDashboard = () => {
 
       toast.success('Project created successfully');
       setShowCreateForm(false);
-      setFormData({ title: '', description: '', studentId: '', advisorIds: [] });
+      setFormData({ title: '', description: '', studentId: '', advisorId: '' });
       fetchDashboardData();
     } catch (error) {
       console.error('Error creating project:', error);
       toast.error('Failed to create project');
     }
-  };
-
-  const handleAdvisorToggle = (advisorId: string) => {
-    setFormData(prev => {
-      const newAdvisorIds = prev.advisorIds.includes(advisorId)
-        ? prev.advisorIds.filter(id => id !== advisorId)
-        : [...prev.advisorIds, advisorId];
-      
-      if (newAdvisorIds.length > 4) {
-        toast.error('Maximum 4 advisors allowed');
-        return prev;
-      }
-      
-      return { ...prev, advisorIds: newAdvisorIds };
-    });
-  };
-
-  const removeAdvisor = (advisorId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      advisorIds: prev.advisorIds.filter(id => id !== advisorId)
-    }));
   };
 
   const getProjectStats = () => {
@@ -276,7 +243,7 @@ const ProjectOfficerDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Create New FYP Project</CardTitle>
-            <CardDescription>Assign a new Final Year Project to a student and advisors (2-4 required)</CardDescription>
+            <CardDescription>Assign a new Final Year Project to a student and advisor</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateProject} className="space-y-4">
@@ -309,56 +276,21 @@ const ProjectOfficerDashboard = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Assign Advisors (2-4 required)</Label>
-                <div className="border rounded-md p-3 min-h-[100px]">
-                  <div className="space-y-2">
-                    {/* Selected advisors display */}
-                    {formData.advisorIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {formData.advisorIds.map((advisorId) => {
-                          const advisor = advisors.find(a => a.id === advisorId);
-                          return advisor ? (
-                            <Badge key={advisorId} variant="secondary" className="flex items-center gap-1">
-                              {advisor.full_name}
-                              <X 
-                                className="h-3 w-3 cursor-pointer hover:text-red-500" 
-                                onClick={() => removeAdvisor(advisorId)}
-                              />
-                            </Badge>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
-                    
-                    {/* Available advisors to select */}
-                    <div className="space-y-1">
-                      {advisors
-                        .filter(advisor => !formData.advisorIds.includes(advisor.id))
-                        .map((advisor) => (
-                          <div 
-                            key={advisor.id}
-                            className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                            onClick={() => handleAdvisorToggle(advisor.id)}
-                          >
-                            <div className="flex-1">
-                              <span className="text-sm">{advisor.full_name} ({advisor.email})</span>
-                            </div>
-                            <Button type="button" size="sm" variant="outline">
-                              Add
-                            </Button>
-                          </div>
-                        ))}
-                    </div>
-                    
-                    {formData.advisorIds.length === 0 && (
-                      <p className="text-sm text-gray-500">Select 2-4 advisors from the list above</p>
-                    )}
-                    
-                    <div className="text-xs text-gray-500 mt-2">
-                      Selected: {formData.advisorIds.length}/4 (minimum 2 required)
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="advisor">Assign Advisor</Label>
+                  <Select value={formData.advisorId} onValueChange={(value) => setFormData({ ...formData, advisorId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an advisor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {advisors.map((advisor) => (
+                        <SelectItem key={advisor.id} value={advisor.id}>
+                          {advisor.full_name} ({advisor.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -374,10 +306,7 @@ const ProjectOfficerDashboard = () => {
               </div>
 
               <div className="flex space-x-3">
-                <Button 
-                  type="submit" 
-                  disabled={!formData.title || !formData.studentId || formData.advisorIds.length < 2}
-                >
+                <Button type="submit" disabled={!formData.title || !formData.studentId}>
                   Create Project
                 </Button>
                 <Button
