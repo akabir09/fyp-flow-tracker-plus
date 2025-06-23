@@ -1,524 +1,448 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Plus, Users, FileText, Calendar, BarChart3, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { Plus, Users, BookOpen, Calendar, CheckCircle, Clock, AlertTriangle, X } from 'lucide-react';
-import { NotificationService } from '@/services/notificationService';
+
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  student: {
+    full_name: string;
+    email: string;
+  } | null;
+  advisor: {
+    full_name: string;
+    email: string;
+  } | null;
+}
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
 
 const ProjectOfficerDashboard = () => {
   const { profile } = useAuth();
-  const queryClient = useQueryClient();
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [newProject, setNewProject] = useState({
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [students, setStudents] = useState<Profile[]>([]);
+  const [advisors, setAdvisors] = useState<Profile[]>([]);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Form states
+  const [formData, setFormData] = useState({
     title: '',
     description: '',
-    selectedStudents: [] as string[],
-    advisorId: ''
+    studentId: '',
+    advisorIds: [] as string[]
   });
 
-  // Fetch all projects
-  const { data: projects = [] } = useQuery({
-    queryKey: ['fyp_projects'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch all projects
+      const { data: projectsData } = await supabase
         .from('fyp_projects')
         .select(`
           *,
-          student:profiles!fyp_projects_student_id_fkey(id, full_name, email),
-          advisor:profiles!fyp_projects_advisor_id_fkey(id, full_name),
-          project_officer:profiles!fyp_projects_project_officer_id_fkey(id, full_name)
+          student:profiles!student_id(full_name, email),
+          advisor:profiles!advisor_id(full_name, email)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
-    },
-  });
+      setProjects(projectsData || []);
 
-  // Fetch all students (those without projects)
-  const { data: availableStudents = [] } = useQuery({
-    queryKey: ['available_students'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch students
+      const { data: studentsData } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'student');
 
-      if (error) throw error;
-      return data || [];
-    },
-  });
+      setStudents(studentsData || []);
 
-  // Fetch all advisors
-  const { data: advisors = [] } = useQuery({
-    queryKey: ['advisors'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch advisors
+      const { data: advisorsData } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'advisor');
 
-      if (error) throw error;
-      return data || [];
-    },
-  });
+      setAdvisors(advisorsData || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Fetch all documents for overview
-  const { data: allDocuments = [] } = useQuery({
-    queryKey: ['all_documents'],
-    queryFn: async () => {
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation for multiselect
+    if (formData.advisorIds.length < 2) {
+      toast.error('Please select at least 2 advisors');
+      return;
+    }
+    
+    if (formData.advisorIds.length > 4) {
+      toast.error('Please select no more than 4 advisors');
+      return;
+    }
+    
+    try {
       const { data, error } = await supabase
-        .from('documents')
-        .select(`
-          *,
-          project:fyp_projects(title),
-          submitted_by_profile:profiles!documents_submitted_by_fkey(full_name)
-        `)
-        .order('submitted_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  const createProjectMutation = useMutation({
-    mutationFn: async (projectData: typeof newProject) => {
-      if (projectData.selectedStudents.length < 2 || projectData.selectedStudents.length > 4) {
-        throw new Error('Please select between 2 and 4 students');
-      }
-
-      const { data: project, error } = await supabase
         .from('fyp_projects')
         .insert({
-          title: projectData.title,
-          description: projectData.description,
-          project_officer_id: profile?.id,
-          advisor_id: projectData.advisorId || null
+          title: formData.title,
+          description: formData.description,
+          student_id: formData.studentId,
+          advisor_id: formData.advisorIds[0], // Primary advisor
+          project_officer_id: profile?.id
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Update students with project assignment
-      const studentUpdates = projectData.selectedStudents.map(studentId => 
-        supabase
-          .from('fyp_projects')
-          .update({ student_id: studentId })
-          .eq('id', project.id)
-      );
+      // Create default phase deadlines
+      const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
+      const baseDate = new Date();
+      
+      for (let i = 0; i < phases.length; i++) {
+        const deadlineDate = new Date(baseDate);
+        deadlineDate.setMonth(deadlineDate.getMonth() + (i + 1) * 3);
+        
+        await supabase
+          .from('phase_deadlines')
+          .insert({
+            project_id: data.id,
+            phase: phases[i],
+            deadline_date: deadlineDate.toISOString().split('T')[0]
+          });
+      }
 
-      await Promise.all(studentUpdates);
-
-      // Send notifications using the notification service
-      await NotificationService.notifyProjectAssignment(
-        projectData.title,
-        projectData.selectedStudents,
-        projectData.advisorId
-      );
-
-      return project;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fyp_projects'] });
-      setIsCreatingProject(false);
-      setNewProject({ title: '', description: '', selectedStudents: [], advisorId: '' });
-      toast.success('Project created successfully with notifications sent to all assigned users');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create project');
-    },
-  });
-
-  const updateProjectMutation = useMutation({
-    mutationFn: async ({ projectId, updates }: { projectId: string; updates: any }) => {
-      const { error } = await supabase
-        .from('fyp_projects')
-        .update(updates)
-        .eq('id', projectId);
-
-      if (error) throw error;
-
-      // Send update notification
-      await NotificationService.notifyProjectUpdate(
-        'Project Updated',
-        `Project details have been updated`,
-        projectId
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fyp_projects'] });
-      toast.success('Project updated with notifications sent');
-    },
-    onError: (error: any) => {
-      toast.error('Failed to update project');
-    },
-  });
-
-  const setDeadlineMutation = useMutation({
-    mutationFn: async ({ projectId, phase, deadline }: { projectId: string; phase: string; deadline: string }) => {
-      const { error } = await supabase
-        .from('phase_deadlines')
-        .upsert({
-          project_id: projectId,
-          phase: phase as any,
-          deadline_date: deadline
+      // Create notifications for student and all selected advisors
+      if (formData.studentId) {
+        await supabase.rpc('create_notification', {
+          user_id: formData.studentId,
+          title: 'New Project Assigned',
+          message: `You have been assigned to project: ${formData.title}`
         });
-
-      if (error) throw error;
-
-      // Get project details for notifications
-      const { data: project } = await supabase
-        .from('fyp_projects')
-        .select('title, student_id, advisor_id')
-        .eq('id', projectId)
-        .single();
-
-      if (project) {
-        const studentIds = project.student_id ? [project.student_id] : [];
-        await NotificationService.notifyDeadlineUpdate(
-          project.title,
-          phase,
-          deadline,
-          studentIds,
-          project.advisor_id
-        );
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phase_deadlines'] });
-      toast.success('Deadline set with notifications sent to all involved parties');
-    },
-    onError: (error: any) => {
-      toast.error('Failed to set deadline');
-    },
-  });
 
-  const handleStudentSelection = (studentId: string) => {
-    setNewProject(prev => {
-      const isSelected = prev.selectedStudents.includes(studentId);
-      if (isSelected) {
-        return {
-          ...prev,
-          selectedStudents: prev.selectedStudents.filter(id => id !== studentId)
-        };
-      } else {
-        if (prev.selectedStudents.length >= 4) {
-          toast.error('Maximum 4 students can be selected');
-          return prev;
-        }
-        return {
-          ...prev,
-          selectedStudents: [...prev.selectedStudents, studentId]
-        };
+      // Notify all selected advisors
+      for (const advisorId of formData.advisorIds) {
+        await supabase.rpc('create_notification', {
+          user_id: advisorId,
+          title: 'New Project Assignment',
+          message: `You have been assigned as advisor for project: ${formData.title}`
+        });
       }
+
+      toast.success('Project created successfully');
+      setShowCreateForm(false);
+      setFormData({ title: '', description: '', studentId: '', advisorIds: [] });
+      fetchDashboardData();
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast.error('Failed to create project');
+    }
+  };
+
+  const handleAdvisorToggle = (advisorId: string) => {
+    setFormData(prev => {
+      const newAdvisorIds = prev.advisorIds.includes(advisorId)
+        ? prev.advisorIds.filter(id => id !== advisorId)
+        : [...prev.advisorIds, advisorId];
+      
+      if (newAdvisorIds.length > 4) {
+        toast.error('Maximum 4 advisors allowed');
+        return prev;
+      }
+      
+      return { ...prev, advisorIds: newAdvisorIds };
     });
   };
 
-  const handleCreateProject = () => {
-    if (!newProject.title.trim()) {
-      toast.error('Please enter a project title');
-      return;
-    }
-    if (newProject.selectedStudents.length < 2) {
-      toast.error('Please select at least 2 students');
-      return;
-    }
-    if (newProject.selectedStudents.length > 4) {
-      toast.error('Please select maximum 4 students');
-      return;
-    }
-    createProjectMutation.mutate(newProject);
+  const removeAdvisor = (advisorId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      advisorIds: prev.advisorIds.filter(id => id !== advisorId)
+    }));
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'suspended':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+  const getProjectStats = () => {
+    const active = projects.filter(p => p.status === 'active').length;
+    const completed = projects.filter(p => p.status === 'completed').length;
+    const suspended = projects.filter(p => p.status === 'suspended').length;
+    
+    return { active, completed, suspended, total: projects.length };
   };
 
-  const getDocumentStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  if (loading) {
+    return <div className="animate-pulse space-y-4">Loading...</div>;
+  }
 
-  const pendingDocuments = allDocuments.filter(doc => doc.status === 'pending');
-  const approvedDocuments = allDocuments.filter(doc => doc.status === 'approved');
-  const rejectedDocuments = allDocuments.filter(doc => doc.status === 'rejected');
+  const stats = getProjectStats();
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-600 p-8 text-white">
-        <div className="relative z-10">
-          <h1 className="text-3xl font-bold">Project Officer Dashboard</h1>
-          <p className="mt-2 text-purple-100">
-            Manage FYP projects, assign students and advisors, and oversee progress
-          </p>
-        </div>
-        <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-white/10"></div>
-        <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-white/5"></div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 bg-white/60 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <BookOpen className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-900">{projects.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 bg-white/60 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-900">
-              {projects.filter(p => p.status === 'active').length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 bg-white/60 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-            <Clock className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-900">{pendingDocuments.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 bg-white/60 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Students</CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-900">{availableStudents.length}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Create Project Section */}
-      <Card className="border-0 bg-white/60 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Create New Project</CardTitle>
-              <CardDescription>
-                Set up a new FYP project and assign students and advisors
-              </CardDescription>
-            </div>
-            <Button
-              onClick={() => setIsCreatingProject(!isCreatingProject)}
-              className="bg-purple-600 text-white hover:bg-purple-700"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Button>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg text-white p-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Project Officer Dashboard</h1>
+            <p className="text-purple-100">Manage FYP projects, assignments, and track overall progress</p>
           </div>
-        </CardHeader>
-        {isCreatingProject && (
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+          <Button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="bg-white text-purple-600 hover:bg-purple-50"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <BarChart3 className="h-8 w-8 text-blue-600" />
               <div>
-                <Label htmlFor="title">Project Title</Label>
-                <Input
-                  id="title"
-                  value={newProject.title}
-                  onChange={(e) => setNewProject(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter project title"
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-sm text-gray-600">Total Projects</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <FileText className="h-8 w-8 text-green-600" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+                <p className="text-sm text-gray-600">Active Projects</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Users className="h-8 w-8 text-purple-600" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{students.length}</p>
+                <p className="text-sm text-gray-600">Students</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-8 w-8 text-orange-600" />
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{advisors.length}</p>
+                <p className="text-sm text-gray-600">Advisors</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Create Project Form */}
+      {showCreateForm && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Create New FYP Project</CardTitle>
+            <CardDescription>Assign a new Final Year Project to a student and advisors (2-4 required)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateProject} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Project Title</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    required
+                    placeholder="Enter project title"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="student">Assign Student</Label>
+                  <Select value={formData.studentId} onValueChange={(value) => setFormData({ ...formData, studentId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a student" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.full_name} ({student.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Assign Advisors (2-4 required)</Label>
+                <div className="border rounded-md p-3 min-h-[100px]">
+                  <div className="space-y-2">
+                    {/* Selected advisors display */}
+                    {formData.advisorIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {formData.advisorIds.map((advisorId) => {
+                          const advisor = advisors.find(a => a.id === advisorId);
+                          return advisor ? (
+                            <Badge key={advisorId} variant="secondary" className="flex items-center gap-1">
+                              {advisor.full_name}
+                              <X 
+                                className="h-3 w-3 cursor-pointer hover:text-red-500" 
+                                onClick={() => removeAdvisor(advisorId)}
+                              />
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                    
+                    {/* Available advisors to select */}
+                    <div className="space-y-1">
+                      {advisors
+                        .filter(advisor => !formData.advisorIds.includes(advisor.id))
+                        .map((advisor) => (
+                          <div 
+                            key={advisor.id}
+                            className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                            onClick={() => handleAdvisorToggle(advisor.id)}
+                          >
+                            <div className="flex-1">
+                              <span className="text-sm">{advisor.full_name} ({advisor.email})</span>
+                            </div>
+                            <Button type="button" size="sm" variant="outline">
+                              Add
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                    
+                    {formData.advisorIds.length === 0 && (
+                      <p className="text-sm text-gray-500">Select 2-4 advisors from the list above</p>
+                    )}
+                    
+                    <div className="text-xs text-gray-500 mt-2">
+                      Selected: {formData.advisorIds.length}/4 (minimum 2 required)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Project Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe the project objectives and scope"
+                  rows={4}
                 />
               </div>
-              <div>
-                <Label htmlFor="advisor">Advisor (Optional)</Label>
-                <Select
-                  value={newProject.advisorId}
-                  onValueChange={(value) => setNewProject(prev => ({ ...prev, advisorId: value }))}
+
+              <div className="flex space-x-3">
+                <Button 
+                  type="submit" 
+                  disabled={!formData.title || !formData.studentId || formData.advisorIds.length < 2}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an advisor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No advisor assigned</SelectItem>
-                    {advisors.map((advisor) => (
-                      <SelectItem key={advisor.id} value={advisor.id}>
-                        {advisor.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  Create Project
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  Cancel
+                </Button>
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={newProject.description}
-                onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter project description"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Select Students (2-4 required)</Label>
-              <div className="mt-2 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                {availableStudents.map((student) => (
-                  <div
-                    key={student.id}
-                    className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-                      newProject.selectedStudents.includes(student.id)
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 bg-white hover:border-purple-300'
-                    }`}
-                    onClick={() => handleStudentSelection(student.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{student.full_name}</p>
-                        <p className="text-sm text-gray-500">{student.email}</p>
-                      </div>
-                      {newProject.selectedStudents.includes(student.id) && (
-                        <CheckCircle className="h-5 w-5 text-purple-600" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-2 text-sm text-gray-500">
-                Selected: {newProject.selectedStudents.length}/4 students
-              </p>
-            </div>
-
-            <div className="flex space-x-4">
-              <Button
-                onClick={handleCreateProject}
-                disabled={createProjectMutation.isPending}
-                className="bg-purple-600 text-white hover:bg-purple-700"
-              >
-                {createProjectMutation.isPending ? 'Creating...' : 'Create Project'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsCreatingProject(false);
-                  setNewProject({ title: '', description: '', selectedStudents: [], advisorId: '' });
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+            </form>
           </CardContent>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {/* Projects Overview */}
-      <Card className="border-0 bg-white/60 backdrop-blur-sm">
+      {/* Projects List */}
+      <Card>
         <CardHeader>
-          <CardTitle>All Projects</CardTitle>
-          <CardDescription>
-            Overview of all FYP projects in the system
-          </CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="h-5 w-5" />
+            <span>All Projects</span>
+          </CardTitle>
+          <CardDescription>Manage and monitor all FYP projects</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {projects.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No projects created yet</p>
-            ) : (
-              projects.map((project: any) => (
-                <div key={project.id} className="rounded-lg border border-purple-100 bg-white/80 p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-purple-900">{project.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{project.description}</p>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-sm text-gray-500">
-                          Student: {project.student?.full_name || 'Not assigned'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Advisor: {project.advisor?.full_name || 'Not assigned'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Project Officer: {project.project_officer?.full_name}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge className={getStatusColor(project.status)}>
-                      {project.status}
-                    </Badge>
+            {projects.map((project) => (
+              <div key={project.id} className="border rounded-lg p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{project.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{project.description}</p>
+                  </div>
+                  <Badge className={
+                    project.status === 'active' ? 'bg-green-100 text-green-800' :
+                    project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }>
+                    {project.status}
+                  </Badge>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-700">Student:</span>
+                    <span className="text-gray-600">
+                      {project.student ? `${project.student.full_name} (${project.student.email})` : 'Not assigned'}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-700">Advisor:</span>
+                    <span className="text-gray-600">
+                      {project.advisor ? `${project.advisor.full_name} (${project.advisor.email})` : 'Not assigned'}
+                    </span>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Document Overview */}
-      <Card className="border-0 bg-white/60 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Document Overview</CardTitle>
-          <CardDescription>
-            Recent document submissions across all projects
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {allDocuments.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No documents submitted yet</p>
-            ) : (
-              allDocuments.slice(0, 10).map((document: any) => (
-                <div key={document.id} className="rounded-lg border border-purple-100 bg-white/80 p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium text-purple-900">{document.title}</h4>
-                      <p className="text-sm text-gray-600">
-                        Project: {document.project?.title}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Submitted by: {document.submitted_by_profile?.full_name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Phase: {document.phase}
-                      </p>
-                    </div>
-                    <Badge className={getDocumentStatusColor(document.status)}>
-                      {document.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))
+              </div>
+            ))}
+            
+            {projects.length === 0 && (
+              <div className="text-center py-8">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Projects Yet</h3>
+                <p className="text-gray-600">Create your first FYP project to get started</p>
+              </div>
             )}
           </div>
         </CardContent>

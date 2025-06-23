@@ -137,10 +137,6 @@ export type Database = {
           id: string
           is_read: boolean | null
           message: string
-          notification_type:
-            | Database["public"]["Enums"]["notification_type"]
-            | null
-          target_role: Database["public"]["Enums"]["user_role"] | null
           title: string
           user_id: string | null
         }
@@ -149,10 +145,6 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message: string
-          notification_type?:
-            | Database["public"]["Enums"]["notification_type"]
-            | null
-          target_role?: Database["public"]["Enums"]["user_role"] | null
           title: string
           user_id?: string | null
         }
@@ -161,10 +153,6 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message?: string
-          notification_type?:
-            | Database["public"]["Enums"]["notification_type"]
-            | null
-          target_role?: Database["public"]["Enums"]["user_role"] | null
           title?: string
           user_id?: string | null
         }
@@ -243,37 +231,13 @@ export type Database = {
     }
     Functions: {
       create_notification: {
-        Args:
-          | { user_id: string; title: string; message: string }
-          | {
-              user_id: string
-              title: string
-              message: string
-              notification_type?: Database["public"]["Enums"]["notification_type"]
-              target_role?: Database["public"]["Enums"]["user_role"]
-            }
+        Args: { user_id: string; title: string; message: string }
         Returns: string
-      }
-      notify_role: {
-        Args: {
-          role_name: Database["public"]["Enums"]["user_role"]
-          title: string
-          message: string
-          notification_type?: Database["public"]["Enums"]["notification_type"]
-        }
-        Returns: number
       }
     }
     Enums: {
       document_status: "pending" | "approved" | "rejected"
       fyp_phase: "phase1" | "phase2" | "phase3" | "phase4"
-      notification_type:
-        | "project_assignment"
-        | "document_submission"
-        | "document_review"
-        | "deadline_reminder"
-        | "project_update"
-        | "system_announcement"
       project_status: "active" | "completed" | "suspended"
       user_role: "student" | "advisor" | "project_officer"
     }
@@ -393,14 +357,6 @@ export const Constants = {
     Enums: {
       document_status: ["pending", "approved", "rejected"],
       fyp_phase: ["phase1", "phase2", "phase3", "phase4"],
-      notification_type: [
-        "project_assignment",
-        "document_submission",
-        "document_review",
-        "deadline_reminder",
-        "project_update",
-        "system_announcement",
-      ],
       project_status: ["active", "completed", "suspended"],
       user_role: ["student", "advisor", "project_officer"],
     },

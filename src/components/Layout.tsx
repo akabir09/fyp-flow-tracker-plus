@@ -2,7 +2,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, User, FileText } from 'lucide-react';
+import { Bell, LogOut, User, FileText, Users, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
@@ -16,11 +16,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'student':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-blue-100 text-blue-800';
       case 'advisor':
-        return 'bg-indigo-100 text-indigo-800';
+        return 'bg-green-100 text-green-800';
       case 'project_officer':
-        return 'bg-violet-100 text-violet-800';
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -42,15 +42,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-purple flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-white" />
-                </div>
-                <h1 className="text-xl font-bold text-gradient-purple">Proactive</h1>
+                <FileText className="h-8 w-8 text-blue-600" />
+                <h1 className="text-xl font-bold text-gray-900">Proactive</h1>
               </div>
             </div>
 
@@ -68,10 +66,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 </>
               )}
-              <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700 hover:bg-purple-50">
+              <Button variant="ghost" size="sm">
                 <Bell className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-purple-600 hover:text-purple-700 hover:bg-purple-50">
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>

@@ -51,16 +51,16 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-purple p-4">
-      <Card className="w-full max-w-md bg-white/95 backdrop-blur-md border-white/20">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">
-            {isSignUp ? 'Create Account' : 'Welcome to ProActive'}
+            {isSignUp ? 'Create Account' : 'Sign In'}
           </CardTitle>
           <CardDescription>
             {isSignUp 
               ? 'Join the FYP Management System' 
-              : 'Your Final Year Project Management System'
+              : 'Access your FYP Management Dashboard'
             }
           </CardDescription>
         </CardHeader>
@@ -117,7 +117,7 @@ const Auth = () => {
                 minLength={6}
               />
             </div>
-            <Button type="submit" className="w-full bg-gradient-purple-dark hover:bg-gradient-purple text-white" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </Button>
           </form>
@@ -125,7 +125,7 @@ const Auth = () => {
             <Button
               variant="link"
               onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-purple-600 hover:text-purple-700"
+              className="text-sm"
             >
               {isSignUp 
                 ? 'Already have an account? Sign in' 
