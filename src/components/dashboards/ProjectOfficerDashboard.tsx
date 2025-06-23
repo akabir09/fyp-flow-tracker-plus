@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,15 +95,13 @@ const ProjectOfficerDashboard = () => {
         throw new Error('Please select between 2 and 4 students');
       }
 
-      const advisorId = projectData.advisorId === 'no-advisor' ? null : projectData.advisorId || null;
-
       const { data: project, error } = await supabase
         .from('fyp_projects')
         .insert({
           title: projectData.title,
           description: projectData.description,
           project_officer_id: profile?.id,
-          advisor_id: advisorId
+          advisor_id: projectData.advisorId || null
         })
         .select()
         .single();
@@ -125,7 +122,7 @@ const ProjectOfficerDashboard = () => {
       await NotificationService.notifyProjectAssignment(
         projectData.title,
         projectData.selectedStudents,
-        advisorId
+        projectData.advisorId
       );
 
       return project;
