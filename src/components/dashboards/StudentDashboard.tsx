@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,7 +94,7 @@ const StudentDashboard = () => {
       case 'rejected':
         return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
-        return <Clock className="h-4 w-4 text-yellow-600" />;
+        return <Clock className="h-4 w-4 text-purple-600" />;
     }
   };
 
@@ -106,7 +105,7 @@ const StudentDashboard = () => {
       case 'rejected':
         return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
+        return <Badge className="bg-purple-100 text-purple-800">Pending</Badge>;
     }
   };
 
@@ -142,16 +141,16 @@ const StudentDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg text-white p-6">
+      <div className="bg-gradient-purple rounded-xl text-white p-6 shadow-lg">
         <h1 className="text-2xl font-bold mb-2">Welcome back, {profile?.full_name}!</h1>
-        <p className="text-blue-100">Track your FYP progress and manage document submissions</p>
+        <p className="text-purple-100">Track your FYP progress and manage document submissions</p>
       </div>
 
       {/* Project Overview */}
-      <Card>
+      <Card className="shadow-sm border-purple-100">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <FileText className="h-5 w-5" />
+          <CardTitle className="flex items-center space-x-2 text-purple-900">
+            <FileText className="h-5 w-5 text-purple-600" />
             <span>Project Overview</span>
           </CardTitle>
         </CardHeader>
@@ -173,9 +172,9 @@ const StudentDashboard = () => {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-                <span className="text-sm text-gray-600">{Math.round(calculateProgress())}%</span>
+                <span className="text-sm text-purple-600 font-semibold">{Math.round(calculateProgress())}%</span>
               </div>
-              <Progress value={calculateProgress()} className="h-2" />
+              <Progress value={calculateProgress()} className="h-3" />
             </div>
           </div>
         </CardContent>
@@ -183,10 +182,10 @@ const StudentDashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Documents Status */}
-        <Card>
+        <Card className="shadow-sm border-purple-100">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Upload className="h-5 w-5" />
+            <CardTitle className="flex items-center space-x-2 text-purple-900">
+              <Upload className="h-5 w-5 text-purple-600" />
               <span>Document Status</span>
             </CardTitle>
             <CardDescription>Track your submissions across all phases</CardDescription>
@@ -196,7 +195,7 @@ const StudentDashboard = () => {
               {['phase1', 'phase2', 'phase3', 'phase4'].map((phase) => {
                 const doc = documents.find(d => d.phase === phase);
                 return (
-                  <div key={phase} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={phase} className="flex items-center justify-between p-3 border border-purple-100 rounded-lg hover:bg-purple-50 transition-colors">
                     <div className="flex items-center space-x-3">
                       {getStatusIcon(doc?.status || 'pending')}
                       <div>
@@ -215,10 +214,10 @@ const StudentDashboard = () => {
         </Card>
 
         {/* Upcoming Deadlines */}
-        <Card>
+        <Card className="shadow-sm border-purple-100">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5" />
+            <CardTitle className="flex items-center space-x-2 text-purple-900">
+              <Calendar className="h-5 w-5 text-purple-600" />
               <span>Upcoming Deadlines</span>
             </CardTitle>
             <CardDescription>Stay on track with important dates</CardDescription>
@@ -230,7 +229,7 @@ const StudentDashboard = () => {
                 const daysUntil = Math.ceil((new Date(deadline.deadline_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 
                 return (
-                  <div key={deadline.phase} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div key={deadline.phase} className="flex items-center justify-between p-3 border border-purple-100 rounded-lg hover:bg-purple-50 transition-colors">
                     <div>
                       <div className="font-medium text-sm">{getPhaseTitle(deadline.phase)}</div>
                       <div className="text-xs text-gray-600">
