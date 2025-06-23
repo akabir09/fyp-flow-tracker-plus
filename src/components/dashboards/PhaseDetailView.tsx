@@ -11,16 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 
-interface Document {
-  id: string;
-  phase: string;
-  title: string;
-  status: 'pending' | 'approved' | 'rejected';
-  advisor_feedback: string | null;
-  submitted_at: string;
-  file_url: string | null;
-}
+type Document = Database['public']['Tables']['documents']['Row'];
+type PhaseType = Database['public']['Enums']['fyp_phase'];
 
 interface Comment {
   id: string;
@@ -28,10 +22,10 @@ interface Comment {
   user_id: string;
   comment: string;
   created_at: string;
-  user: {
-    full_name: string;
-    role: string;
-  };
+  profiles: {
+    full_name: string | null;
+    role: Database['public']['Enums']['user_role'] | null;
+  } | null;
 }
 
 interface PhaseDetailViewProps {
@@ -94,7 +88,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
         .from('documents')
         .select('*')
         .eq('project_id', projectId)
-        .eq('phase', phase)
+        .eq('phase', phase as PhaseType)
         .order('submitted_at', { ascending: false });
 
       if (error) throw error;
@@ -113,7 +107,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
         .from('document_comments')
         .select(`
           *,
-          user:profiles(full_name, role)
+          profiles(full_name, role)
         `)
         .eq('document_id', documentId)
         .order('created_at', { ascending: true });
@@ -133,16 +127,12 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     }
 
     try {
-      // Upload file to storage (simplified - would need proper file upload implementation)
-      const fileExt = documentFile.name.split('.').pop();
-      const fileName = `${projectId}/${phase}/${Date.now()}.${fileExt}`;
-      
       // Insert document record
       const { error } = await supabase
         .from('documents')
         .insert({
           project_id: projectId,
-          phase: phase,
+          phase: phase as PhaseType,
           title: documentTitle,
           submitted_by: profile?.id,
           status: 'pending'
@@ -292,12 +282,12 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{document.title}</CardTitle>
                   <div className="flex items-center space-x-2">
-                    {getStatusIcon(document.status)}
-                    {getStatusBadge(document.status)}
+                    {getStatusIcon(document.status || 'pending')}
+                    {getStatusBadge(document.status || 'pending')}
                   </div>
                 </div>
                 <CardDescription>
-                  Submitted on {new Date(document.submitted_at).toLocaleDateString()}
+                  Submitted on {document.submitted_at ? new Date(document.submitted_at).toLocaleDateString() : 'Unknown'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -350,10 +340,10 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium">Status:</span>
-                {selectedDocument && getStatusBadge(selectedDocument.status)}
+                {selectedDocument && getStatusBadge(selectedDocument.status || 'pending')}
               </div>
               <div className="text-sm text-gray-600">
-                Submitted: {selectedDocument && new Date(selectedDocument.submitted_at).toLocaleString()}
+                Submitted: {selectedDocument?.submitted_at && new Date(selectedDocument.submitted_at).toLocaleString()}
               </div>
             </div>
 
@@ -369,9 +359,9 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                   <div key={comment.id} className="bg-white border rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-sm">
-                        {comment.user.full_name}
+                        {comment.profiles?.full_name || 'Unknown User'}
                         <Badge variant="outline" className="ml-2 text-xs">
-                          {comment.user.role}
+                          {comment.profiles?.role || 'unknown'}
                         </Badge>
                       </span>
                       <span className="text-xs text-gray-500">

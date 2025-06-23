@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import PhaseDetailView from './PhaseDetailView';
+import { Database } from '@/integrations/supabase/types';
 
 interface Project {
   id: string;
@@ -20,14 +22,7 @@ interface Project {
   } | null;
 }
 
-interface Document {
-  id: string;
-  phase: string;
-  title: string;
-  status: 'pending' | 'approved' | 'rejected';
-  advisor_feedback: string | null;
-  submitted_at: string;
-}
+type Document = Database['public']['Tables']['documents']['Row'];
 
 interface Deadline {
   phase: string;
