@@ -9,16 +9,237 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          advisor_feedback: string | null
+          file_url: string | null
+          id: string
+          phase: Database["public"]["Enums"]["fyp_phase"]
+          project_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["document_status"] | null
+          submitted_at: string | null
+          submitted_by: string | null
+          title: string
+        }
+        Insert: {
+          advisor_feedback?: string | null
+          file_url?: string | null
+          id?: string
+          phase: Database["public"]["Enums"]["fyp_phase"]
+          project_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          title: string
+        }
+        Update: {
+          advisor_feedback?: string | null
+          file_url?: string | null
+          id?: string
+          phase?: Database["public"]["Enums"]["fyp_phase"]
+          project_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          submitted_at?: string | null
+          submitted_by?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fyp_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fyp_projects: {
+        Row: {
+          advisor_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          project_officer_id: string | null
+          status: Database["public"]["Enums"]["project_status"] | null
+          student_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          advisor_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          project_officer_id?: string | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          student_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          advisor_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          project_officer_id?: string | null
+          status?: Database["public"]["Enums"]["project_status"] | null
+          student_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fyp_projects_advisor_id_fkey"
+            columns: ["advisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fyp_projects_project_officer_id_fkey"
+            columns: ["project_officer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fyp_projects_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phase_deadlines: {
+        Row: {
+          created_at: string | null
+          deadline_date: string
+          id: string
+          phase: Database["public"]["Enums"]["fyp_phase"]
+          project_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deadline_date: string
+          id?: string
+          phase: Database["public"]["Enums"]["fyp_phase"]
+          project_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deadline_date?: string
+          id?: string
+          phase?: Database["public"]["Enums"]["fyp_phase"]
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_deadlines_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fyp_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_notification: {
+        Args: { user_id: string; title: string; message: string }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      document_status: "pending" | "approved" | "rejected"
+      fyp_phase: "phase1" | "phase2" | "phase3" | "phase4"
+      project_status: "active" | "completed" | "suspended"
+      user_role: "student" | "advisor" | "project_officer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +354,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      document_status: ["pending", "approved", "rejected"],
+      fyp_phase: ["phase1", "phase2", "phase3", "phase4"],
+      project_status: ["active", "completed", "suspended"],
+      user_role: ["student", "advisor", "project_officer"],
+    },
   },
 } as const
