@@ -2,8 +2,9 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, User, FileText } from 'lucide-react';
+import { LogOut, User, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import NotificationPopover from './NotificationPopover';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { profile, signOut } = useAuth();
@@ -68,9 +69,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 </>
               )}
-              <Button variant="ghost" size="sm" className="text-purple-600 hover:text-purple-700 hover:bg-purple-50">
-                <Bell className="h-4 w-4" />
-              </Button>
+              <NotificationPopover />
               <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-purple-600 hover:text-purple-700 hover:bg-purple-50">
                 <LogOut className="h-4 w-4" />
               </Button>
