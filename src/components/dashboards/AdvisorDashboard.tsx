@@ -1,308 +1,334 @@
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Users, FileText, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  student: {
-    full_name: string;
-    email: string;
-  };
-}
-
-interface Document {
-  id: string;
-  project_id: string;
-  phase: string;
-  title: string;
-  status: 'pending' | 'approved' | 'rejected';
-  advisor_feedback: string | null;
-  submitted_at: string;
-  project: {
-    title: string;
-    student_id: string;
-    student: {
-      full_name: string;
-    };
-  };
-}
+import { Users, FileText, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { format } from 'date-fns';
+import { NotificationService } from '@/services/notificationService';
 
 const AdvisorDashboard = () => {
   const { profile } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [pendingDocuments, setPendingDocuments] = useState<Document[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
+  const queryClient = useQueryClient();
+  const [reviewingDocument, setReviewingDocument] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected'>('approved');
 
-  useEffect(() => {
-    if (profile) {
-      fetchAdvisorData();
-    }
-  }, [profile]);
-
-  const fetchAdvisorData = async () => {
-    try {
-      // Fetch advisor's projects
-      const { data: projectsData } = await supabase
+  // Fetch projects where I'm the advisor
+  const { data: advisedProjects = [] } = useQuery({
+    queryKey: ['advised_projects', profile?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('fyp_projects')
         .select(`
           *,
-          student:profiles!student_id(full_name, email)
+          student:profiles!fyp_projects_student_id_fkey(id, full_name, email),
+          project_officer:profiles!fyp_projects_project_officer_id_fkey(id, full_name)
         `)
         .eq('advisor_id', profile?.id);
 
-      setProjects(projectsData || []);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!profile?.id,
+  });
 
-      // Fetch pending documents for review
-      const { data: docsData } = await supabase
+  // Fetch documents that need review from my projects
+  const { data: documentsToReview = [] } = useQuery({
+    queryKey: ['documents_to_review', profile?.id],
+    queryFn: async () => {
+      const projectIds = advisedProjects.map(p => p.id);
+      if (projectIds.length === 0) return [];
+
+      const { data, error } = await supabase
         .from('documents')
         .select(`
           *,
-          project:fyp_projects(
-            title,
-            student_id,
-            student:profiles!student_id(full_name)
-          )
+          project:fyp_projects(title),
+          submitted_by_profile:profiles!documents_submitted_by_fkey(full_name)
         `)
-        .in('project_id', (projectsData || []).map(p => p.id))
-        .eq('status', 'pending')
-        .order('submitted_at', { ascending: true });
+        .in('project_id', projectIds)
+        .order('submitted_at', { ascending: false });
 
-      setPendingDocuments(docsData || []);
-    } catch (error) {
-      console.error('Error fetching advisor data:', error);
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: advisedProjects.length > 0,
+  });
 
-  const handleDocumentAction = async (docId: string, action: 'approved' | 'rejected', feedback?: string) => {
-    try {
-      const { error } = await supabase
+  const reviewDocumentMutation = useMutation({
+    mutationFn: async ({ documentId, status, feedback }: { documentId: string; status: 'approved' | 'rejected'; feedback: string }) => {
+      const { data: document, error } = await supabase
         .from('documents')
         .update({
-          status: action,
-          advisor_feedback: feedback || null,
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: profile?.id
+          status,
+          advisor_feedback: feedback,
+          reviewed_by: profile?.id,
+          reviewed_at: new Date().toISOString()
         })
-        .eq('id', docId);
+        .eq('id', documentId)
+        .select(`
+          *,
+          project:fyp_projects(title, student_id)
+        `)
+        .single();
 
       if (error) throw error;
 
-      toast.success(`Document ${action} successfully`);
-      
-      // Create notification for student
-      const doc = pendingDocuments.find(d => d.id === docId);
-      if (doc?.project?.student_id) {
-        await supabase.rpc('create_notification', {
-          user_id: doc.project.student_id,
-          title: `Document ${action}`,
-          message: `Your ${doc.phase} submission has been ${action}${feedback ? `: ${feedback}` : ''}`
-        });
+      // Send notifications
+      if (document.project?.student_id) {
+        await NotificationService.notifyDocumentReview(
+          document.project.title,
+          document.title,
+          status,
+          document.project.student_id,
+          profile?.id!
+        );
       }
 
-      // Refresh data
-      fetchAdvisorData();
-      setSelectedDoc(null);
+      return document;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents_to_review'] });
+      setReviewingDocument(null);
       setFeedback('');
-    } catch (error) {
-      console.error('Error updating document:', error);
-      toast.error('Failed to update document status');
+      toast.success('Document reviewed successfully with notifications sent');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to review document');
+    },
+  });
+
+  const handleReviewSubmit = (documentId: string) => {
+    if (!feedback.trim()) {
+      toast.error('Please provide feedback');
+      return;
+    }
+    reviewDocumentMutation.mutate({
+      documentId,
+      status: reviewStatus,
+      feedback
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const getPhaseTitle = (phase: string) => {
-    const phases = {
-      phase1: 'Phase 1: Project Proposal',
-      phase2: 'Phase 2: Literature Review',
-      phase3: 'Phase 3: Implementation',
-      phase4: 'Phase 4: Final Report'
-    };
-    return phases[phase as keyof typeof phases] || phase;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'rejected':
+        return <XCircle className="h-4 w-4" />;
+      case 'pending':
+        return <Clock className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
   };
 
-  if (loading) {
-    return <div className="animate-pulse space-y-4">Loading...</div>;
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Welcome Header */}
-      <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg text-white p-6">
-        <h1 className="text-2xl font-bold mb-2">Advisor Dashboard</h1>
-        <p className="text-green-100">Review student submissions and track project progress</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600 p-8 text-white">
+        <div className="relative z-10">
+          <h1 className="text-3xl font-bold">Advisor Dashboard</h1>
+          <p className="mt-2 text-purple-100">
+            Manage your advised projects and review student submissions
+          </p>
+        </div>
+        <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-white/10"></div>
+        <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-white/5"></div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
-                <p className="text-sm text-gray-600">Active Projects</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-8 w-8 text-yellow-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{pendingDocuments.length}</p>
-                <p className="text-sm text-gray-600">Pending Reviews</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-2">
-              <FileText className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{projects.length * 4}</p>
-                <p className="text-sm text-gray-600">Total Documents</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Assigned Projects */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5" />
-              <span>Assigned Projects</span>
-            </CardTitle>
-            <CardDescription>Students under your supervision</CardDescription>
+      {/* Stats Cards */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="border-0 bg-white/60 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Advised Projects</CardTitle>
+            <Users className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {projects.map((project) => (
-                <div key={project.id} className="p-4 border rounded-lg">
-                  <h3 className="font-semibold text-gray-900">{project.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{project.description}</p>
-                  <div className="flex items-center space-x-2 mt-2">
-                    <Badge className="bg-blue-100 text-blue-800">
-                      {project.student.full_name}
+            <div className="text-2xl font-bold text-purple-900">{advisedProjects.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 bg-white/60 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
+            <FileText className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-900">
+              {documentsToReview.filter(d => d.status === 'pending').length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 bg-white/60 backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+            <MessageSquare className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-900">{documentsToReview.length}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Documents to Review */}
+      <Card className="border-0 bg-white/60 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle>Documents Awaiting Review</CardTitle>
+          <CardDescription>
+            Review and provide feedback on student submissions
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {documentsToReview.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No documents to review</p>
+            ) : (
+              documentsToReview.map((document: any) => (
+                <div key={document.id} className="rounded-lg border border-purple-100 bg-white/80 p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-purple-900">{document.title}</h3>
+                      <p className="text-sm text-gray-600">
+                        Project: {document.project?.title}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Submitted by: {document.submitted_by_profile?.full_name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Phase: {document.phase} • {format(new Date(document.submitted_at), 'MMM dd, yyyy')}
+                      </p>
+                      {document.advisor_feedback && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                          <strong>Feedback:</strong> {document.advisor_feedback}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge className={`${getStatusColor(document.status)} flex items-center space-x-1`}>
+                        {getStatusIcon(document.status)}
+                        <span className="capitalize">{document.status}</span>
+                      </Badge>
+                      {document.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          onClick={() => setReviewingDocument(document.id)}
+                          className="bg-purple-600 text-white hover:bg-purple-700"
+                        >
+                          Review
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {reviewingDocument === document.id && (
+                    <div className="mt-4 space-y-4 border-t border-purple-100 pt-4">
+                      <div>
+                        <Label htmlFor="status">Review Status</Label>
+                        <Select value={reviewStatus} onValueChange={(value: 'approved' | 'rejected') => setReviewStatus(value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="approved">Approve</SelectItem>
+                            <SelectItem value="rejected">Reject</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="feedback">Feedback</Label>
+                        <Textarea
+                          id="feedback"
+                          value={feedback}
+                          onChange={(e) => setFeedback(e.target.value)}
+                          placeholder="Provide detailed feedback..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => handleReviewSubmit(document.id)}
+                          disabled={reviewDocumentMutation.isPending}
+                          className="bg-purple-600 text-white hover:bg-purple-700"
+                        >
+                          {reviewDocumentMutation.isPending ? 'Submitting...' : 'Submit Review'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setReviewingDocument(null);
+                            setFeedback('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Advised Projects */}
+      <Card className="border-0 bg-white/60 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle>Your Advised Projects</CardTitle>
+          <CardDescription>
+            Overview of projects you are supervising
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {advisedProjects.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No projects assigned yet</p>
+            ) : (
+              advisedProjects.map((project: any) => (
+                <div key={project.id} className="rounded-lg border border-purple-100 bg-white/80 p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-purple-900">{project.title}</h3>
+                      <p className="text-sm text-gray-600">{project.description}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Student: {project.student?.full_name || 'Not assigned'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Project Officer: {project.project_officer?.full_name}
+                      </p>
+                    </div>
+                    <Badge className={project.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {project.status}
                     </Badge>
                   </div>
                 </div>
-              ))}
-              {projects.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No projects assigned yet</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Reviews */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
-              <span>Pending Reviews</span>
-            </CardTitle>
-            <CardDescription>Documents awaiting your review</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {pendingDocuments.map((doc) => (
-                <div key={doc.id} className="p-4 border rounded-lg">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{getPhaseTitle(doc.phase)}</h4>
-                      <p className="text-sm text-gray-600">{doc.project.title}</p>
-                      <p className="text-xs text-gray-500">by {doc.project.student.full_name}</p>
-                    </div>
-                    <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-                  </div>
-                  <div className="flex space-x-2 mt-3">
-                    <Button
-                      size="sm"
-                      onClick={() => setSelectedDoc(doc)}
-                      variant="outline"
-                    >
-                      Review
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              {pendingDocuments.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No pending reviews</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Review Modal */}
-      {selectedDoc && (
-        <Card className="fixed inset-x-4 top-20 z-50 max-w-2xl mx-auto bg-white border-2 shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Review Document</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDoc(null)}>
-                ×
-              </Button>
-            </CardTitle>
-            <CardDescription>
-              {getPhaseTitle(selectedDoc.phase)} - {selectedDoc.project.title}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Feedback (optional for approval, required for rejection)
-              </label>
-              <Textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Provide feedback for the student..."
-                rows={4}
-              />
-            </div>
-            <div className="flex space-x-3">
-              <Button
-                onClick={() => handleDocumentAction(selectedDoc.id, 'approved', feedback)}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Approve
-              </Button>
-              <Button
-                onClick={() => handleDocumentAction(selectedDoc.id, 'rejected', feedback)}
-                variant="destructive"
-                disabled={!feedback.trim()}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Reject
-              </Button>
-              <Button variant="outline" onClick={() => setSelectedDoc(null)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

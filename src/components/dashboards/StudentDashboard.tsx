@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { Upload, FileText, Calendar, CheckCircle, Clock, AlertTriangle, GraduationCap } from 'lucide-react';
+import { format } from 'date-fns';
+import { NotificationService } from '@/services/notificationService';
 
 interface Project {
   id: string;
@@ -35,6 +41,14 @@ interface Deadline {
 
 const StudentDashboard = () => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
+  const [isSubmittingDocument, setIsSubmittingDocument] = useState(false);
+  const [newDocument, setNewDocument] = useState({
+    title: '',
+    phase: '',
+    fileUrl: ''
+  });
+
   const [project, setProject] = useState<Project | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
@@ -122,6 +136,57 @@ const StudentDashboard = () => {
       phase4: 'Phase 4: Final Report'
     };
     return phases[phase as keyof typeof phases] || phase;
+  };
+
+  const submitDocumentMutation = useMutation({
+    mutationFn: async (documentData: typeof newDocument) => {
+      if (!project) throw new Error('No project found');
+
+      const { data: document, error } = await supabase
+        .from('documents')
+        .insert({
+          title: documentData.title,
+          phase: documentData.phase as any,
+          file_url: documentData.fileUrl,
+          project_id: project.id,
+          submitted_by: profile?.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Send notifications
+      await NotificationService.notifyDocumentSubmission(
+        project.title,
+        documentData.title,
+        profile?.id!,
+        project.advisor_id
+      );
+
+      return document;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setIsSubmittingDocument(false);
+      setNewDocument({ title: '', phase: '', fileUrl: '' });
+      toast.success('Document submitted successfully with notifications sent');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to submit document');
+    },
+  });
+
+  const handleSubmitDocument = () => {
+    if (!newDocument.title.trim()) {
+      toast.error('Please enter a document title');
+      return;
+    }
+    if (!newDocument.phase) {
+      toast.error('Please select a phase');
+      return;
+    }
+    submitDocumentMutation.mutate(newDocument);
   };
 
   if (loading) {
@@ -246,6 +311,60 @@ const StudentDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Document Submission Form */}
+      <Card className="shadow-sm border-purple-100">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-purple-900">
+            <Upload className="h-5 w-5 text-purple-600" />
+            <span>Submit Document</span>
+          </CardTitle>
+          <CardDescription>Upload your document and select a phase</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitDocument}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Document Title</Label>
+                <Input
+                  id="title"
+                  type="text"
+                  value={newDocument.title}
+                  onChange={(e) => setNewDocument({ ...newDocument, title: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="phase">Phase</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a phase" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="phase1">Phase 1: Project Proposal</SelectItem>
+                    <SelectItem value="phase2">Phase 2: Literature Review</SelectItem>
+                    <SelectItem value="phase3">Phase 3: Implementation</SelectItem>
+                    <SelectItem value="phase4">Phase 4: Final Report</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="fileUrl">File URL</Label>
+                <Input
+                  id="fileUrl"
+                  type="text"
+                  value={newDocument.fileUrl}
+                  onChange={(e) => setNewDocument({ ...newDocument, fileUrl: e.target.value })}
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={isSubmittingDocument}>
+                {isSubmittingDocument ? 'Submitting...' : 'Submit Document'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
