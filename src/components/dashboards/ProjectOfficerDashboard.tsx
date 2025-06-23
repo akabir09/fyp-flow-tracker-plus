@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,9 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Users, FileText, Calendar, BarChart3, X } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Project {
   id: string;
@@ -43,6 +44,7 @@ const ProjectOfficerDashboard = () => {
   const [advisors, setAdvisors] = useState<Profile[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -343,27 +345,61 @@ const ProjectOfficerDashboard = () => {
                   </div>
                 )}
 
-                {/* Student Selection List */}
-                <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
-                  <div className="space-y-2">
-                    {students.map((student) => (
-                      <div key={student.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`student-${student.id}`}
-                          checked={formData.studentIds.includes(student.id)}
-                          onCheckedChange={(checked) => handleStudentSelection(student.id, checked as boolean)}
-                          disabled={!formData.studentIds.includes(student.id) && formData.studentIds.length >= 4}
-                        />
-                        <Label 
-                          htmlFor={`student-${student.id}`} 
-                          className="flex-1 cursor-pointer"
-                        >
-                          {student.full_name} ({student.email})
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* Student Search Dropdown */}
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between"
+                    >
+                      Search and select students...
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search students..." />
+                      <CommandList>
+                        <CommandEmpty>No students found.</CommandEmpty>
+                        <CommandGroup>
+                          {students.map((student) => {
+                            const isSelected = formData.studentIds.includes(student.id);
+                            const isDisabled = !isSelected && formData.studentIds.length >= 4;
+                            
+                            return (
+                              <CommandItem
+                                key={student.id}
+                                value={`${student.full_name} ${student.email}`}
+                                onSelect={() => {
+                                  if (!isDisabled) {
+                                    handleStudentSelection(student.id, !isSelected);
+                                  }
+                                }}
+                                className={cn(
+                                  "flex items-center gap-2",
+                                  isDisabled && "opacity-50 cursor-not-allowed"
+                                )}
+                              >
+                                <Check
+                                  className={cn(
+                                    "h-4 w-4",
+                                    isSelected ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{student.full_name}</span>
+                                  <span className="text-sm text-gray-500">{student.email}</span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
 
                 {formData.studentIds.length < 2 && (
                   <p className="text-sm text-red-600">Please select at least 2 students</p>
