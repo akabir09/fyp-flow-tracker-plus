@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ProjectDetailsView from './ProjectDetailsView';
 import ProjectResources from '@/components/ProjectResources';
+import GenericResources from '@/components/GenericResources';
 
 interface Project {
   id: string;
@@ -265,28 +266,24 @@ const ProjectOfficerDashboard = () => {
   }
 
   // Show resources view if selected
-  if (selectedProjectId && showResourcesView) {
-    const selectedProject = projects.find(p => p.id === selectedProjectId);
+  if (showResourcesView) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <Button
               variant="outline"
-              onClick={() => {
-                setShowResourcesView(false);
-                setSelectedProjectId(null);
-              }}
+              onClick={() => setShowResourcesView(false)}
               className="mb-4"
             >
               ← Back to Dashboard
             </Button>
-            <h1 className="text-2xl font-bold">Project Resources</h1>
-            <p className="text-gray-600">{selectedProject?.title}</p>
+            <h1 className="text-2xl font-bold">General Resources</h1>
+            <p className="text-gray-600">Upload and manage resources accessible to all users</p>
           </div>
         </div>
         
-        <ProjectResources projectId={selectedProjectId} canUpload={true} />
+        <GenericResources canUpload={true} />
       </div>
     );
   }
@@ -302,13 +299,22 @@ const ProjectOfficerDashboard = () => {
             <h1 className="text-2xl font-bold mb-2">Project Officer Dashboard</h1>
             <p className="text-purple-100">Manage FYP projects, assignments, and track overall progress</p>
           </div>
-          <Button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-white text-purple-600 hover:bg-purple-50"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Project
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => setShowResourcesView(true)}
+              className="bg-white text-purple-600 hover:bg-purple-50"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Resources
+            </Button>
+            <Button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="bg-white text-purple-600 hover:bg-purple-50"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Project
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -587,17 +593,6 @@ const ProjectOfficerDashboard = () => {
                     }>
                       {project.status}
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedProjectId(project.id);
-                        setShowResourcesView(true);
-                      }}
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      Resources
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

@@ -12,9 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, Download, FileText, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface ProjectResource {
+interface Resource {
   id: string;
-  project_id: string;
   uploaded_by: string;
   file_name: string;
   file_url: string;
@@ -27,14 +26,13 @@ interface ProjectResource {
   } | null;
 }
 
-interface ProjectResourcesProps {
-  projectId: string;
+interface GenericResourcesProps {
   canUpload?: boolean;
 }
 
-const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProps) => {
+const GenericResources = ({ canUpload = false }: GenericResourcesProps) => {
   const { profile } = useAuth();
-  const [resources, setResources] = useState<ProjectResource[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -43,17 +41,16 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
 
   useEffect(() => {
     fetchResources();
-  }, [projectId]);
+  }, []);
 
   const fetchResources = async () => {
     try {
       const { data, error } = await supabase
-        .from('project_resources')
+        .from('resources')
         .select(`
           *,
           profiles(full_name)
         `)
-        .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -81,25 +78,23 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
       // Generate unique file path
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${projectId}/${fileName}`;
 
       // Upload file to storage
       const { error: uploadError } = await supabase.storage
-        .from('project-resources')
-        .upload(filePath, selectedFile);
+        .from('general-resources')
+        .upload(fileName, selectedFile);
 
       if (uploadError) throw uploadError;
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('project-resources')
-        .getPublicUrl(filePath);
+        .from('general-resources')
+        .getPublicUrl(fileName);
 
       // Save resource record to database
       const { error: dbError } = await supabase
-        .from('project_resources')
+        .from('resources')
         .insert({
-          project_id: projectId,
           uploaded_by: profile.id,
           file_name: selectedFile.name,
           file_url: publicUrl,
@@ -123,7 +118,7 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
     }
   };
 
-  const handleDownload = async (resource: ProjectResource) => {
+  const handleDownload = async (resource: Resource) => {
     try {
       // Create a temporary link and trigger download
       const link = document.createElement('a');
@@ -142,7 +137,7 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
   const handleDelete = async (resourceId: string) => {
     try {
       const { error } = await supabase
-        .from('project_resources')
+        .from('resources')
         .delete()
         .eq('id', resourceId);
 
@@ -171,7 +166,7 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
     <div className="space-y-4">
       {canUpload && (
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Project Resources</h3>
+          <h3 className="text-lg font-semibold">General Resources</h3>
           <Button onClick={() => setUploadDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Upload Resource
@@ -187,8 +182,8 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Resources</h3>
               <p className="text-gray-600">
                 {canUpload 
-                  ? 'Upload your first project resource to get started' 
-                  : 'No resources have been uploaded for this project yet'
+                  ? 'Upload your first general resource to get started' 
+                  : 'No resources have been uploaded yet'
                 }
               </p>
             </CardContent>
@@ -246,9 +241,9 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload Project Resource</DialogTitle>
+            <DialogTitle>Upload General Resource</DialogTitle>
             <DialogDescription>
-              Upload a file that will be accessible to all project members
+              Upload a file that will be accessible to all users
             </DialogDescription>
           </DialogHeader>
           
@@ -298,4 +293,4 @@ const ProjectResources = ({ projectId, canUpload = false }: ProjectResourcesProp
   );
 };
 
-export default ProjectResources;
+export default GenericResources;
