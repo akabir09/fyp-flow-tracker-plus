@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,7 +118,7 @@ const AdvisorDashboard = () => {
       // Create a temporary link and trigger download
       const link = document.createElement('a');
       link.href = document.file_url;
-      link.download = `${document.title}.pdf`; // You might want to extract the actual file extension
+      link.download = `${document.title}.pdf`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -432,7 +433,7 @@ const AdvisorDashboard = () => {
             <Button
               variant="destructive"
               onClick={() => selectedDocument && handleReviewDocument(selectedDocument.id, 'rejected')}
-              disabled={!feedback.trim()} // Require feedback for rejection
+              disabled={!feedback.trim()}
             >
               <XCircle className="h-4 w-4 mr-2" />
               Reject
@@ -444,7 +445,7 @@ const AdvisorDashboard = () => {
               Approve
             </Button>
           </DialogFooter>
-        </Dialog>
+        </DialogContent>
       </Dialog>
 
       {/* Comments Dialog */}
