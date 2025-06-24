@@ -138,45 +138,6 @@ const StudentDashboard = () => {
     return true;
   };
 
-  const getDeadlineInfo = (phase: string) => {
-    const deadline = deadlines.find(d => d.phase === phase);
-    if (!deadline) return null;
-
-    const deadlineDate = new Date(deadline.deadline_date);
-    const now = new Date();
-    const timeDiff = deadlineDate.getTime() - now.getTime();
-    const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-
-    const isOverdue = daysLeft < 0;
-    const isUrgent = daysLeft <= 3 && daysLeft >= 0;
-    const isWarning = daysLeft <= 7 && daysLeft > 3;
-
-    let badgeColor = 'bg-green-100 text-green-800'; // Default - plenty of time
-    let timeText = '';
-
-    if (isOverdue) {
-      badgeColor = 'bg-red-100 text-red-800';
-      timeText = `Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? 's' : ''}`;
-    } else if (isUrgent) {
-      badgeColor = 'bg-red-100 text-red-800';
-      timeText = daysLeft === 0 ? 'Due Today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
-    } else if (isWarning) {
-      badgeColor = 'bg-orange-100 text-orange-800';
-      timeText = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
-    } else {
-      timeText = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
-    }
-
-    return {
-      badgeColor,
-      timeText,
-      isOverdue,
-      isUrgent,
-      isWarning,
-      deadlineDate: deadlineDate.toLocaleDateString()
-    };
-  };
-
   const handlePhaseClick = (phase: string) => {
     if (isPhaseUnlocked(phase)) {
       setSelectedPhase(phase);
@@ -268,7 +229,7 @@ const StudentDashboard = () => {
               {['phase1', 'phase2', 'phase3', 'phase4'].map((phase) => {
                 const doc = documents.find(d => d.phase === phase);
                 const isUnlocked = isPhaseUnlocked(phase);
-                const deadlineInfo = getDeadlineInfo(phase);
+                const deadline = deadlines.find(d => d.phase === phase);
                 
                 return (
                   <div 
@@ -296,20 +257,15 @@ const StudentDashboard = () => {
                             {doc.advisor_feedback}
                           </div>
                         )}
-                        {deadlineInfo && (
+                        {deadline && (
                           <div className="text-xs text-gray-500 mt-1">
-                            Due: {deadlineInfo.deadlineDate}
+                            Due: {new Date(deadline.deadline_date).toLocaleDateString()}
                           </div>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
                       {getStatusBadge(doc?.status || 'pending')}
-                      {deadlineInfo && (
-                        <Badge className={deadlineInfo.badgeColor}>
-                          {deadlineInfo.timeText}
-                        </Badge>
-                      )}
                       {isUnlocked && (
                         <Button variant="ghost" size="sm">
                           View
@@ -335,8 +291,6 @@ const StudentDashboard = () => {
           <CardContent>
             <div className="space-y-3">
               {deadlines.map((deadline) => {
-                const deadlineInfo = getDeadlineInfo(deadline.phase);
-                
                 return (
                   <div key={deadline.phase} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
@@ -345,11 +299,6 @@ const StudentDashboard = () => {
                         {new Date(deadline.deadline_date).toLocaleDateString()}
                       </div>
                     </div>
-                    {deadlineInfo && (
-                      <Badge className={deadlineInfo.badgeColor}>
-                        {deadlineInfo.timeText}
-                      </Badge>
-                    )}
                   </div>
                 );
               })}
