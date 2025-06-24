@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye } from 'lucide-react';
+import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 
@@ -45,6 +44,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
   const [documentTitle, setDocumentTitle] = useState('');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
   const getPhaseTitle = (phase: string) => {
     const phases = {
@@ -75,6 +75,35 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
         return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
         return <Badge className="bg-yellow-100 text-yellow-800">Pending Review</Badge>;
+    }
+  };
+
+  const uploadFileToStorage = async (file: File, fileName: string): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${projectId}/${phase}/${fileName}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('fyp-documents')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // Get the public URL
+      const { data } = supabase.storage
+        .from('fyp-documents')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
     }
   };
 
@@ -126,8 +155,16 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
       return;
     }
 
+    setUploading(true);
     try {
-      // Insert document record
+      // Upload file to storage
+      const fileUrl = await uploadFileToStorage(documentFile, documentTitle);
+      
+      if (!fileUrl) {
+        throw new Error('Failed to upload file');
+      }
+
+      // Insert document record with file URL
       const { error } = await supabase
         .from('documents')
         .insert({
@@ -135,7 +172,8 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
           phase: phase as PhaseType,
           title: documentTitle,
           submitted_by: profile?.id,
-          status: 'pending'
+          status: 'pending',
+          file_url: fileUrl
         });
 
       if (error) throw error;
@@ -148,6 +186,29 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     } catch (error) {
       console.error('Error uploading document:', error);
       toast.error('Failed to upload document');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownloadDocument = async (document: Document) => {
+    if (!document.file_url) {
+      toast.error('No file available for download');
+      return;
+    }
+
+    try {
+      // Create a temporary link and trigger download
+      const link = document.createElement('a');
+      link.href = document.file_url;
+      link.download = `${document.title}.pdf`; // You might want to extract the actual file extension
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Failed to download document');
     }
   };
 
@@ -258,7 +319,9 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                 <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleUploadDocument}>Upload</Button>
+                <Button onClick={handleUploadDocument} disabled={uploading}>
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -301,6 +364,16 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                     )}
                   </div>
                   <div className="flex space-x-2">
+                    {document.file_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadDocument(document)}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -345,6 +418,18 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
               <div className="text-sm text-gray-600">
                 Submitted: {selectedDocument?.submitted_at && new Date(selectedDocument.submitted_at).toLocaleString()}
               </div>
+              {selectedDocument?.file_url && (
+                <div className="mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => selectedDocument && handleDownloadDocument(selectedDocument)}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Document
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Comments Section */}
