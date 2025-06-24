@@ -191,8 +191,8 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     }
   };
 
-  const handleDownloadDocument = async (document: Document) => {
-    if (!document.file_url) {
+  const handleDownloadDocument = async (doc: Document) => {
+    if (!doc.file_url) {
       toast.error('No file available for download');
       return;
     }
@@ -200,8 +200,8 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     try {
       // Create a temporary link and trigger download
       const link = document.createElement('a');
-      link.href = document.file_url;
-      link.download = `${document.title}.pdf`; // You might want to extract the actual file extension
+      link.href = doc.file_url;
+      link.download = `${doc.title}.pdf`; // You might want to extract the actual file extension
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();

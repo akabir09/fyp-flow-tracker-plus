@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,8 +107,8 @@ const AdvisorDashboard = () => {
     }
   };
 
-  const handleDownloadDocument = async (document: Document) => {
-    if (!document.file_url) {
+  const handleDownloadDocument = async (doc: Document) => {
+    if (!doc.file_url) {
       toast.error('No file available for download');
       return;
     }
@@ -117,8 +116,8 @@ const AdvisorDashboard = () => {
     try {
       // Create a temporary link and trigger download
       const link = document.createElement('a');
-      link.href = document.file_url;
-      link.download = `${document.title}.pdf`;
+      link.href = doc.file_url;
+      link.download = `${doc.title}.pdf`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
