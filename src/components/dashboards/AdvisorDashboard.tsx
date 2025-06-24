@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -297,14 +298,14 @@ const AdvisorDashboard = () => {
     );
   }
 
-  if (showResourcesView && selectedProject) {
+  if (showResourcesView) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <Button
               variant="outline"
-              onClick={handleBackFromResources}
+              onClick={() => setShowResourcesView(false)}
               className="mb-4"
             >
               ← Back to Dashboard
