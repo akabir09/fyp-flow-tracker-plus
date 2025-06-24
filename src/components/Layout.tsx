@@ -204,39 +204,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 <span>General Comments</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Comments Display */}
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className={`flex items-start space-x-3 ${getMessageAlignment(comment.user.id)}`}
-                  >
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarFallback className={`text-white text-sm ${getAvatarColor(comment.user.role)}`}>
-                        {getUserInitials(comment.user.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className={`max-w-md ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
-                      <div className={`rounded-lg px-4 py-3 ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-medium text-sm">
-                            {comment.user.full_name}
-                          </span>
-                          <Badge variant="outline" className="text-xs px-2 py-0">
-                            {getRoleLabel(comment.user.role)}
-                          </Badge>
-                        </div>
-                        <p className="break-words text-sm">{comment.comment}</p>
-                        <div className="flex items-center space-x-1 mt-2 text-xs opacity-75">
-                          <Calendar className="h-3 w-3" />
-                          <span>{format(new Date(comment.created_at), 'MMM dd, HH:mm')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            
                 
                 {comments.length === 0 && (
                   <div className="text-center py-12 text-gray-500">
@@ -248,45 +216,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               </div>
 
               {/* Comment Input */}
-              <div className="border-t pt-6">
-                <div className="flex items-start space-x-3">
-                  <Avatar className="w-8 h-8 flex-shrink-0">
-                    <AvatarFallback className={`text-white text-sm ${getAvatarColor(profile?.role || 'student')}`}>
-                      {profile ? getUserInitials(profile.full_name || 'User') : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 space-y-3">
-                    <Textarea
-                      placeholder="Add a comment..."
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      className="min-h-[80px] resize-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                          e.preventDefault();
-                          submitComment();
-                        }
-                      }}
-                    />
-                    
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-500">
-                        Ctrl+Enter to send
-                      </span>
-                      <Button
-                        onClick={submitComment}
-                        disabled={isSubmittingComment || !newComment.trim()}
-                        size="sm"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        {isSubmittingComment ? 'Sending...' : 'Send'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
+            
           </Card>
         </div>
       </main>
