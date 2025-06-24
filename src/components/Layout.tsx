@@ -28,13 +28,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const [comments, setComments] = useState<GeneralComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [showComments, setShowComments] = useState(false);
 
   useEffect(() => {
-    if (showComments) {
-      fetchComments();
-    }
-  }, [showComments]);
+    fetchComments();
+  }, []);
 
   const fetchComments = async () => {
     try {
@@ -184,13 +181,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 </>
               )}
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setShowComments(!showComments)}
-              >
-                <MessageSquare className="h-4 w-4" />
-              </Button>
               <Button variant="ghost" size="sm">
                 <Bell className="h-4 w-4" />
               </Button>
@@ -205,53 +195,42 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
-      </main>
-
-      {/* Comments Section */}
-      {showComments && (
-        <div className="fixed bottom-0 right-0 w-96 h-96 bg-white border-l border-t shadow-lg z-40">
-          <Card className="h-full flex flex-col">
-            <CardHeader className="flex-shrink-0 pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2 text-lg">
-                  <MessageSquare className="h-5 w-5" />
-                  <span>General Comments</span>
-                </CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setShowComments(false)}
-                >
-                  ×
-                </Button>
-              </div>
+        
+        {/* Comments Section */}
+        <div className="mt-12">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MessageSquare className="h-5 w-5" />
+                <span>General Comments</span>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-4 pt-0">
+            <CardContent className="space-y-6">
               {/* Comments Display */}
-              <div className="flex-1 space-y-3 mb-4 overflow-y-auto">
+              <div className="space-y-4 max-h-96 overflow-y-auto">
                 {comments.map((comment) => (
                   <div
                     key={comment.id}
-                    className={`flex items-start space-x-2 ${getMessageAlignment(comment.user.id)}`}
+                    className={`flex items-start space-x-3 ${getMessageAlignment(comment.user.id)}`}
                   >
-                    <Avatar className="w-7 h-7 flex-shrink-0">
-                      <AvatarFallback className={`text-white text-xs ${getAvatarColor(comment.user.role)}`}>
+                    <Avatar className="w-8 h-8 flex-shrink-0">
+                      <AvatarFallback className={`text-white text-sm ${getAvatarColor(comment.user.role)}`}>
                         {getUserInitials(comment.user.full_name)}
                       </AvatarFallback>
                     </Avatar>
                     
-                    <div className={`max-w-xs ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
-                      <div className={`rounded-lg px-3 py-2 text-sm ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
-                        <div className="flex items-center space-x-1 mb-1">
-                          <span className="font-medium text-xs">
+                    <div className={`max-w-md ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
+                      <div className={`rounded-lg px-4 py-3 ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="font-medium text-sm">
                             {comment.user.full_name}
                           </span>
-                          <Badge variant="outline" className="text-xs px-1 py-0">
-                            {comment.user.role}
+                          <Badge variant="outline" className="text-xs px-2 py-0">
+                            {getRoleLabel(comment.user.role)}
                           </Badge>
                         </div>
-                        <p className="break-words">{comment.comment}</p>
-                        <div className="flex items-center space-x-1 mt-1 text-xs opacity-70">
+                        <p className="break-words text-sm">{comment.comment}</p>
+                        <div className="flex items-center space-x-1 mt-2 text-xs opacity-75">
                           <Calendar className="h-3 w-3" />
                           <span>{format(new Date(comment.created_at), 'MMM dd, HH:mm')}</span>
                         </div>
@@ -261,28 +240,29 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                 ))}
                 
                 {comments.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No comments yet. Start the conversation!</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">No comments yet</p>
+                    <p className="text-sm">Start the conversation!</p>
                   </div>
                 )}
               </div>
 
               {/* Comment Input */}
-              <div className="border-t pt-3">
-                <div className="flex items-start space-x-2">
-                  <Avatar className="w-7 h-7 flex-shrink-0">
-                    <AvatarFallback className={`text-white text-xs ${getAvatarColor(profile?.role || 'student')}`}>
+              <div className="border-t pt-6">
+                <div className="flex items-start space-x-3">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarFallback className={`text-white text-sm ${getAvatarColor(profile?.role || 'student')}`}>
                       {profile ? getUserInitials(profile.full_name || 'User') : 'U'}
                     </AvatarFallback>
                   </Avatar>
                   
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-3">
                     <Textarea
                       placeholder="Add a comment..."
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
-                      className="min-h-[60px] resize-none text-sm"
+                      className="min-h-[80px] resize-none"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                           e.preventDefault();
@@ -292,7 +272,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                     />
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-500">
+                      <span className="text-sm text-gray-500">
                         Ctrl+Enter to send
                       </span>
                       <Button
@@ -300,7 +280,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         disabled={isSubmittingComment || !newComment.trim()}
                         size="sm"
                       >
-                        <Send className="h-3 w-3 mr-1" />
+                        <Send className="h-4 w-4 mr-2" />
                         {isSubmittingComment ? 'Sending...' : 'Send'}
                       </Button>
                     </div>
@@ -310,7 +290,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             </CardContent>
           </Card>
         </div>
-      )}
+      </main>
     </div>
   );
 };
