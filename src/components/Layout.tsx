@@ -16,9 +16,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'student':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-purple-100 text-purple-800';
       case 'advisor':
-        return 'bg-green-100 text-green-800';
+        return 'bg-purple-100 text-purple-800';
       case 'project_officer':
         return 'bg-purple-100 text-purple-800';
       default:
@@ -47,7 +47,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <FileText className="h-8 w-8 text-blue-600" />
+                <FileText className="h-8 w-8 text-purple-600" />
                 <h1 className="text-xl font-bold text-gray-900">Proactive</h1>
               </div>
             </div>
