@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,7 +54,11 @@ const ProjectOfficerDashboard = () => {
     title: '',
     description: '',
     studentIds: [] as string[],
-    advisorId: ''
+    advisorId: '',
+    phase1Deadline: '',
+    phase2Deadline: '',
+    phase3Deadline: '',
+    phase4Deadline: ''
   });
 
   useEffect(() => {
@@ -138,6 +143,12 @@ const ProjectOfficerDashboard = () => {
       toast.error('Please select maximum 4 students');
       return;
     }
+
+    // Validate phase deadlines
+    if (!formData.phase1Deadline || !formData.phase2Deadline || !formData.phase3Deadline || !formData.phase4Deadline) {
+      toast.error('Please set deadlines for all phases');
+      return;
+    }
     
     try {
       // Create projects for each selected student
@@ -156,20 +167,22 @@ const ProjectOfficerDashboard = () => {
 
         if (error) throw error;
 
-        // Create default phase deadlines for each project
+        // Create phase deadlines for each project
         const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
-        const baseDate = new Date();
+        const deadlines = [
+          formData.phase1Deadline,
+          formData.phase2Deadline,
+          formData.phase3Deadline,
+          formData.phase4Deadline
+        ];
         
         for (let i = 0; i < phases.length; i++) {
-          const deadlineDate = new Date(baseDate);
-          deadlineDate.setMonth(deadlineDate.getMonth() + (i + 1) * 3); // 3 months apart
-          
           await supabase
             .from('phase_deadlines')
             .insert({
               project_id: data.id,
               phase: phases[i],
-              deadline_date: deadlineDate.toISOString().split('T')[0]
+              deadline_date: deadlines[i]
             });
         }
 
@@ -196,7 +209,16 @@ const ProjectOfficerDashboard = () => {
 
       toast.success(`Project created successfully for ${formData.studentIds.length} students`);
       setShowCreateForm(false);
-      setFormData({ title: '', description: '', studentIds: [], advisorId: '' });
+      setFormData({ 
+        title: '', 
+        description: '', 
+        studentIds: [], 
+        advisorId: '',
+        phase1Deadline: '',
+        phase2Deadline: '',
+        phase3Deadline: '',
+        phase4Deadline: ''
+      });
       fetchDashboardData();
     } catch (error) {
       console.error('Error creating project:', error);
@@ -306,7 +328,7 @@ const ProjectOfficerDashboard = () => {
             <CardDescription>Assign a new Final Year Project to students and advisor (Select 2-4 students)</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreateProject} className="space-y-4">
+            <form onSubmit={handleCreateProject} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Project Title</Label>
@@ -416,6 +438,53 @@ const ProjectOfficerDashboard = () => {
                 {formData.studentIds.length < 2 && (
                   <p className="text-sm text-red-600">Please select at least 2 students</p>
                 )}
+              </div>
+
+              {/* Phase Deadlines Section */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Phase Deadlines</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phase1">Phase 1 Deadline</Label>
+                    <Input
+                      id="phase1"
+                      type="date"
+                      value={formData.phase1Deadline}
+                      onChange={(e) => setFormData({ ...formData, phase1Deadline: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phase2">Phase 2 Deadline</Label>
+                    <Input
+                      id="phase2"
+                      type="date"
+                      value={formData.phase2Deadline}
+                      onChange={(e) => setFormData({ ...formData, phase2Deadline: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phase3">Phase 3 Deadline</Label>
+                    <Input
+                      id="phase3"
+                      type="date"
+                      value={formData.phase3Deadline}
+                      onChange={(e) => setFormData({ ...formData, phase3Deadline: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phase4">Phase 4 Deadline</Label>
+                    <Input
+                      id="phase4"
+                      type="date"
+                      value={formData.phase4Deadline}
+                      onChange={(e) => setFormData({ ...formData, phase4Deadline: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">

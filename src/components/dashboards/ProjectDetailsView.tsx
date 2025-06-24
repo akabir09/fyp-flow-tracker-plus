@@ -1,12 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, MessageSquare, Download, Calendar, User, AlertCircle } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, Download, Calendar, User, AlertCircle, Edit, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -71,13 +73,30 @@ interface PhaseStats {
   commentsCount: number;
 }
 
+interface PhaseDeadline {
+  id: string;
+  phase: string;
+  deadline_date: string;
+  project_id: string;
+}
+
 const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [phaseStats, setPhaseStats] = useState<PhaseStats[]>([]);
+  const [phaseDeadlines, setPhaseDeadlines] = useState<PhaseDeadline[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    phase1Deadline: '',
+    phase2Deadline: '',
+    phase3Deadline: '',
+    phase4Deadline: ''
+  });
 
   useEffect(() => {
     fetchProjectDetails();
@@ -97,6 +116,32 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
         .single();
 
       setProject(projectData);
+
+      // Fetch phase deadlines
+      const { data: deadlinesData } = await supabase
+        .from('phase_deadlines')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('phase');
+
+      setPhaseDeadlines(deadlinesData || []);
+
+      // Set edit form with current project data
+      if (projectData) {
+        const deadlineMap = (deadlinesData || []).reduce((acc, deadline) => {
+          acc[deadline.phase] = deadline.deadline_date;
+          return acc;
+        }, {} as Record<string, string>);
+
+        setEditForm({
+          title: projectData.title || '',
+          description: projectData.description || '',
+          phase1Deadline: deadlineMap.phase1 || '',
+          phase2Deadline: deadlineMap.phase2 || '',
+          phase3Deadline: deadlineMap.phase3 || '',
+          phase4Deadline: deadlineMap.phase4 || ''
+        });
+      }
 
       // Fetch documents
       const { data: documentsData } = await supabase
@@ -186,6 +231,58 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
     }
   };
 
+  const handleSaveProject = async () => {
+    try {
+      // Update project details
+      const { error: projectError } = await supabase
+        .from('fyp_projects')
+        .update({
+          title: editForm.title,
+          description: editForm.description
+        })
+        .eq('id', projectId);
+
+      if (projectError) throw projectError;
+
+      // Update phase deadlines
+      const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
+      const deadlines = [
+        editForm.phase1Deadline,
+        editForm.phase2Deadline,
+        editForm.phase3Deadline,
+        editForm.phase4Deadline
+      ];
+
+      for (let i = 0; i < phases.length; i++) {
+        const existingDeadline = phaseDeadlines.find(d => d.phase === phases[i]);
+        
+        if (existingDeadline) {
+          // Update existing deadline
+          await supabase
+            .from('phase_deadlines')
+            .update({ deadline_date: deadlines[i] })
+            .eq('id', existingDeadline.id);
+        } else {
+          // Insert new deadline
+          await supabase
+            .from('phase_deadlines')
+            .insert({
+              project_id: projectId,
+              phase: phases[i],
+              deadline_date: deadlines[i]
+            });
+        }
+      }
+
+      toast.success('Project updated successfully');
+      setIsEditing(false);
+      fetchProjectDetails();
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast.error('Failed to update project');
+    }
+  };
+
   if (loading) {
     return <div className="animate-pulse space-y-4">Loading project details...</div>;
   }
@@ -197,14 +294,35 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center space-x-4">
-        <Button variant="outline" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
-          <p className="text-gray-600">Project Details & Analytics</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
+            <p className="text-gray-600">Project Details & Analytics</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {!isEditing ? (
+            <Button onClick={() => setIsEditing(true)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Project
+            </Button>
+          ) : (
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveProject}>
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -214,30 +332,127 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
           <CardTitle>Project Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Student</h4>
-              <p className="text-sm text-gray-600">
-                {project.student ? `${project.student.full_name} (${project.student.email})` : 'Not assigned'}
-              </p>
+          {isEditing ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-title">Project Title</Label>
+                  <Input
+                    id="edit-title"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    placeholder="Enter project title"
+                  />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Status</h4>
+                  <Badge className={getStatusBadgeColor(project.status)}>
+                    {project.status}
+                  </Badge>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Project Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  placeholder="Enter project description"
+                  rows={4}
+                />
+              </div>
+
+              {/* Phase Deadlines Editing */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium">Phase Deadlines</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phase1">Phase 1 Deadline</Label>
+                    <Input
+                      id="edit-phase1"
+                      type="date"
+                      value={editForm.phase1Deadline}
+                      onChange={(e) => setEditForm({ ...editForm, phase1Deadline: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phase2">Phase 2 Deadline</Label>
+                    <Input
+                      id="edit-phase2"
+                      type="date"
+                      value={editForm.phase2Deadline}
+                      onChange={(e) => setEditForm({ ...editForm, phase2Deadline: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phase3">Phase 3 Deadline</Label>
+                    <Input
+                      id="edit-phase3"
+                      type="date"
+                      value={editForm.phase3Deadline}
+                      onChange={(e) => setEditForm({ ...editForm, phase3Deadline: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-phase4">Phase 4 Deadline</Label>
+                    <Input
+                      id="edit-phase4"
+                      type="date"
+                      value={editForm.phase4Deadline}
+                      onChange={(e) => setEditForm({ ...editForm, phase4Deadline: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+          ) : (
             <div>
-              <h4 className="font-medium text-gray-900 mb-2">Advisor</h4>
-              <p className="text-sm text-gray-600">
-                {project.advisor ? `${project.advisor.full_name} (${project.advisor.email})` : 'Not assigned'}
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Student</h4>
+                  <p className="text-sm text-gray-600">
+                    {project.student ? `${project.student.full_name} (${project.student.email})` : 'Not assigned'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Advisor</h4>
+                  <p className="text-sm text-gray-600">
+                    {project.advisor ? `${project.advisor.full_name} (${project.advisor.email})` : 'Not assigned'}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Status</h4>
+                  <Badge className={getStatusBadgeColor(project.status)}>
+                    {project.status}
+                  </Badge>
+                </div>
+              </div>
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-900 mb-2">Description</h4>
+                <p className="text-sm text-gray-600">{project.description || 'No description provided'}</p>
+              </div>
+              
+              {/* Phase Deadlines Display */}
+              {phaseDeadlines.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Phase Deadlines</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {phaseDeadlines.map((deadline) => (
+                      <div key={deadline.id} className="border rounded-lg p-3">
+                        <h5 className="font-medium text-sm text-gray-900 mb-1 capitalize">
+                          {deadline.phase.replace('phase', 'Phase ')}
+                        </h5>
+                        <p className="text-sm text-gray-600">
+                          {format(new Date(deadline.deadline_date), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">Status</h4>
-              <Badge className={getStatusBadgeColor(project.status)}>
-                {project.status}
-              </Badge>
-            </div>
-          </div>
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-900 mb-2">Description</h4>
-            <p className="text-sm text-gray-600">{project.description || 'No description provided'}</p>
-          </div>
+          )}
         </CardContent>
       </Card>
 
