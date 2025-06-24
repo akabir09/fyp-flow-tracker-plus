@@ -8,9 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, MessageSquare, Download, Calendar, User, AlertCircle, Edit, Save, X } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ArrowLeft, FileText, MessageSquare, Download, Calendar, User, AlertCircle, Edit, Save, X, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ProjectDetailsViewProps {
   projectId: string;
@@ -97,6 +99,9 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
     phase3Deadline: '',
     phase4Deadline: ''
   });
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const { profile } = useAuth();
 
   useEffect(() => {
     fetchProjectDetails();
@@ -280,6 +285,80 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
     } catch (error) {
       console.error('Error updating project:', error);
       toast.error('Failed to update project');
+    }
+  };
+
+  const submitComment = async () => {
+    if (!newComment.trim() || !profile) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    try {
+      // For project-level comments, we'll need to create a general comment
+      // Since we don't have a project_comments table, we'll use document_comments with a null document_id
+      const { error } = await supabase
+        .from('document_comments')
+        .insert({
+          comment: newComment.trim(),
+          user_id: profile.id,
+          document_id: null // This indicates it's a project-level comment
+        });
+
+      if (error) throw error;
+
+      setNewComment('');
+      toast.success('Comment added successfully');
+      fetchProjectDetails(); // Refresh to show new comment
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      toast.error('Failed to submit comment');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const getUserInitials = (fullName: string) => {
+    return fullName
+      .split(' ')
+      .map(name => name.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'student':
+        return 'bg-blue-500';
+      case 'advisor':
+        return 'bg-green-500';
+      case 'project_officer':
+        return 'bg-purple-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const getMessageAlignment = (userId: string) => {
+    return userId === profile?.id ? 'flex-row-reverse' : 'flex-row';
+  };
+
+  const getMessageBgColor = (userId: string, role: string) => {
+    if (userId === profile?.id) {
+      return 'bg-blue-500 text-white';
+    }
+    
+    switch (role) {
+      case 'advisor':
+        return 'bg-green-100 text-green-800';
+      case 'project_officer':
+        return 'bg-purple-100 text-purple-800';
+      case 'student':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -571,39 +650,94 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <MessageSquare className="h-5 w-5" />
-                <span>All Comments & Feedback</span>
+                <span>Project Discussion</span>
               </CardTitle>
+              <CardDescription>
+                General discussion and comments about this project
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="font-medium">{comment.user.full_name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {comment.user.role}
-                        </Badge>
-                        {comment.document && (
-                          <span className="text-sm text-gray-500">
-                            on {comment.document.title} ({comment.document.phase.replace('phase', 'Phase ')})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <Calendar className="h-4 w-4" />
-                        {format(new Date(comment.created_at), 'MMM dd, yyyy HH:mm')}
+              {/* Comments Display */}
+              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                {comments
+                  .filter(comment => !comment.document) // Only show project-level comments
+                  .map((comment) => (
+                    <div
+                      key={comment.id}
+                      className={`flex items-start space-x-3 ${getMessageAlignment(comment.user.id)}`}
+                    >
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarFallback className={`text-white text-xs ${getRoleColor(comment.user.role)}`}>
+                          {getUserInitials(comment.user.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className={`max-w-xs lg:max-w-md ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
+                        <div className={`rounded-lg px-4 py-2 ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="font-medium text-sm">
+                              {comment.user.full_name}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {comment.user.role}
+                            </Badge>
+                          </div>
+                          <p className="text-sm break-words">{comment.comment}</p>
+                          <div className="flex items-center space-x-1 mt-2 text-xs opacity-70">
+                            <Calendar className="h-3 w-3" />
+                            <span>{format(new Date(comment.created_at), 'MMM dd, HH:mm')}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <p className="text-gray-700">{comment.comment}</p>
-                  </div>
-                ))}
-                {comments.length === 0 && (
+                  ))}
+                
+                {comments.filter(comment => !comment.document).length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    No comments found for this project
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No comments yet. Start the discussion!</p>
                   </div>
                 )}
+              </div>
+
+              {/* Comment Input */}
+              <div className="border-t pt-4">
+                <div className="flex items-start space-x-3">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarFallback className={`text-white text-xs ${getRoleColor(profile?.role || 'student')}`}>
+                      {profile ? getUserInitials(profile.full_name || 'User') : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 space-y-3">
+                    <Textarea
+                      placeholder="Add a comment to the project discussion..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="min-h-[80px] resize-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          submitComment();
+                        }
+                      }}
+                    />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">
+                        Press Ctrl+Enter to send
+                      </span>
+                      <Button
+                        onClick={submitComment}
+                        disabled={isSubmittingComment || !newComment.trim()}
+                        size="sm"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        {isSubmittingComment ? 'Sending...' : 'Send'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
