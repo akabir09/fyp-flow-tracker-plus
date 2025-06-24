@@ -310,7 +310,7 @@ const AdvisorDashboard = () => {
               ← Back to Dashboard
             </Button>
             <h1 className="text-2xl font-bold">General Resources</h1>
-            <p className="text-gray-600">View resources available to all users</p>
+            <p className="text-gray-600">View and download resources available to all users</p>
           </div>
         </div>
         
@@ -325,6 +325,16 @@ const AdvisorDashboard = () => {
       <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg text-white p-6">
         <h1 className="text-2xl font-bold mb-2">Welcome back, {profile?.full_name}!</h1>
         <p className="text-green-100">Review student submissions and provide feedback</p>
+        <div className="mt-4">
+          <Button
+            variant="secondary"
+            onClick={() => setShowResourcesView(true)}
+            className="bg-white/20 text-white border-white/30 hover:bg-white/30"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            View Resources
+          </Button>
+        </div>
       </div>
 
       {/* Projects Overview */}
@@ -361,14 +371,6 @@ const AdvisorDashboard = () => {
                   <Badge className="bg-blue-100 text-blue-800">
                     {project.status}
                   </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewResources(project)}
-                  >
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    Resources
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

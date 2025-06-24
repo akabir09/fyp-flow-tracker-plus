@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock, Lock } from 'lucide-react';
+import { Upload, Calendar, FileText, AlertCircle, CheckCircle, Clock, Lock, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import PhaseDetailView from './PhaseDetailView';
+import GenericResources from '@/components/GenericResources';
 import { Database } from '@/integrations/supabase/types';
 
 interface Project {
@@ -35,6 +36,7 @@ const StudentDashboard = () => {
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
+  const [showResourcesView, setShowResourcesView] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -196,6 +198,38 @@ const StudentDashboard = () => {
         <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">No Project Assigned</h3>
         <p className="text-gray-600">You haven't been assigned to any FYP project yet.</p>
+        <div className="mt-6">
+          <Button
+            onClick={() => setShowResourcesView(true)}
+            variant="outline"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            View Available Resources
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show resources view if requested
+  if (showResourcesView) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => setShowResourcesView(false)}
+              className="mb-4"
+            >
+              ← Back to Dashboard
+            </Button>
+            <h1 className="text-2xl font-bold">General Resources</h1>
+            <p className="text-gray-600">View and download resources available to all users</p>
+          </div>
+        </div>
+        
+        <GenericResources canUpload={false} />
       </div>
     );
   }
@@ -218,6 +252,16 @@ const StudentDashboard = () => {
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg text-white p-6">
         <h1 className="text-2xl font-bold mb-2">Welcome back, {profile?.full_name}!</h1>
         <p className="text-blue-100">Track your FYP progress and manage document submissions</p>
+        <div className="mt-4">
+          <Button
+            variant="secondary"
+            onClick={() => setShowResourcesView(true)}
+            className="bg-white/20 text-white border-white/30 hover:bg-white/30"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            View Resources
+          </Button>
+        </div>
       </div>
 
       {/* Project Overview */}
