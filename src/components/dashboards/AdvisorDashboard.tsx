@@ -11,7 +11,7 @@ import { FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, User, E
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import PhaseDetailView from './PhaseDetailView';
-import ProjectResources from '@/components/ProjectResources';
+import GenericResources from '@/components/GenericResources';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -309,12 +309,12 @@ const AdvisorDashboard = () => {
             >
               ← Back to Dashboard
             </Button>
-            <h1 className="text-2xl font-bold">Project Resources</h1>
-            <p className="text-gray-600">{selectedProject.title}</p>
+            <h1 className="text-2xl font-bold">General Resources</h1>
+            <p className="text-gray-600">View resources available to all users</p>
           </div>
         </div>
         
-        <ProjectResources projectId={selectedProject.id} canUpload={false} />
+        <GenericResources canUpload={false} />
       </div>
     );
   }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,6 @@ import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown, E
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ProjectDetailsView from './ProjectDetailsView';
-import ProjectResources from '@/components/ProjectResources';
 import GenericResources from '@/components/GenericResources';
 
 interface Project {
