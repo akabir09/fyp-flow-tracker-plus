@@ -11,9 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import ProjectDetailsView from './ProjectDetailsView';
 
 interface Project {
   id: string;
@@ -43,6 +44,7 @@ const ProjectOfficerDashboard = () => {
   const [students, setStudents] = useState<Profile[]>([]);
   const [advisors, setAdvisors] = useState<Profile[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
@@ -212,6 +214,16 @@ const ProjectOfficerDashboard = () => {
 
   if (loading) {
     return <div className="animate-pulse space-y-4">Loading...</div>;
+  }
+
+  // Show project details view if a project is selected
+  if (selectedProjectId) {
+    return (
+      <ProjectDetailsView
+        projectId={selectedProjectId}
+        onBack={() => setSelectedProjectId(null)}
+      />
+    );
   }
 
   const stats = getProjectStats();
@@ -451,17 +463,27 @@ const ProjectOfficerDashboard = () => {
             {projects.map((project) => (
               <div key={project.id} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-3">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-semibold text-gray-900">{project.title}</h3>
                     <p className="text-sm text-gray-600 mt-1">{project.description}</p>
                   </div>
-                  <Badge className={
-                    project.status === 'active' ? 'bg-green-100 text-green-800' :
-                    project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }>
-                    {project.status}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={
+                      project.status === 'active' ? 'bg-green-100 text-green-800' :
+                      project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }>
+                      {project.status}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedProjectId(project.id)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Details
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
