@@ -23,10 +23,10 @@ interface ProjectDetail {
   description: string;
   status: string;
   created_at: string;
-  student: {
+  students: {
     full_name: string;
     email: string;
-  } | null;
+  }[];
   advisor: {
     full_name: string;
     email: string;
@@ -109,13 +109,26 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
         .from('fyp_projects')
         .select(`
           *,
-          student:profiles!student_id(full_name, email),
+          project_students(
+            student:profiles!student_id(full_name, email)
+          ),
           advisor:profiles!advisor_id(full_name, email)
         `)
         .eq('id', projectId)
         .single();
 
-      setProject(projectData);
+      // Transform the data to match our interface
+      const transformedProject = projectData ? {
+        id: projectData.id,
+        title: projectData.title,
+        description: projectData.description,
+        status: projectData.status,
+        created_at: projectData.created_at,
+        students: projectData.project_students?.map((ps: any) => ps.student).filter(Boolean) || [],
+        advisor: projectData.advisor
+      } : null;
+
+      setProject(transformedProject);
 
       // Fetch phase deadlines
       const { data: deadlinesData } = await supabase
@@ -410,10 +423,20 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
             <div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Student</h4>
-                  <p className="text-sm text-gray-600">
-                    {project.student ? `${project.student.full_name} (${project.student.email})` : 'Not assigned'}
-                  </p>
+                  <h4 className="font-medium text-gray-900 mb-2">Students</h4>
+                  <div className="text-sm text-gray-600">
+                    {project.students.length > 0 ? (
+                      <div className="space-y-1">
+                        {project.students.map((student, index) => (
+                          <div key={index}>
+                            {student.full_name} ({student.email})
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>No students assigned</span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Advisor</h4>
