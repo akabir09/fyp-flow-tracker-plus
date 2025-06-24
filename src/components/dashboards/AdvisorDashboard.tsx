@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Users, FileText, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Users, FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Project {
@@ -27,6 +27,7 @@ interface Document {
   status: 'pending' | 'approved' | 'rejected';
   advisor_feedback: string | null;
   submitted_at: string;
+  file_url: string | null;
   project: {
     title: string;
     student_id: string;
@@ -36,6 +37,18 @@ interface Document {
   };
 }
 
+interface Comment {
+  id: string;
+  document_id: string;
+  user_id: string;
+  comment: string;
+  created_at: string;
+  profiles: {
+    full_name: string | null;
+    role: string | null;
+  } | null;
+}
+
 const AdvisorDashboard = () => {
   const { profile } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -43,6 +56,9 @@ const AdvisorDashboard = () => {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -87,6 +103,25 @@ const AdvisorDashboard = () => {
     }
   };
 
+  const fetchComments = async (documentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('document_comments')
+        .select(`
+          *,
+          profiles(full_name, role)
+        `)
+        .eq('document_id', documentId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      toast.error('Failed to load comments');
+    }
+  };
+
   const handleDocumentAction = async (docId: string, action: 'approved' | 'rejected', feedback?: string) => {
     try {
       const { error } = await supabase
@@ -116,11 +151,61 @@ const AdvisorDashboard = () => {
       // Refresh data
       fetchAdvisorData();
       setSelectedDoc(null);
+      setViewingDocument(null);
       setFeedback('');
     } catch (error) {
       console.error('Error updating document:', error);
       toast.error('Failed to update document status');
     }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !viewingDocument) return;
+
+    try {
+      const { error } = await supabase
+        .from('document_comments')
+        .insert({
+          document_id: viewingDocument.id,
+          user_id: profile?.id,
+          comment: newComment
+        });
+
+      if (error) throw error;
+
+      setNewComment('');
+      fetchComments(viewingDocument.id);
+      toast.success('Comment added successfully');
+      
+      // Notify student about new comment
+      if (viewingDocument.project?.student_id) {
+        await supabase.rpc('create_notification', {
+          user_id: viewingDocument.project.student_id,
+          title: 'New Comment',
+          message: `Your advisor commented on ${viewingDocument.title}`
+        });
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast.error('Failed to add comment');
+    }
+  };
+
+  const handleDownloadDocument = (document: Document) => {
+    if (document.file_url) {
+      // In a real implementation, this would download the file
+      // For now, we'll just show a toast
+      toast.success('Document download started');
+      console.log('Downloading document:', document.file_url);
+    } else {
+      toast.error('No file available for download');
+    }
+  };
+
+  const openDocumentDetails = (document: Document) => {
+    setViewingDocument(document);
+    fetchComments(document.id);
+    setFeedback(document.advisor_feedback || '');
   };
 
   const getPhaseTitle = (phase: string) => {
@@ -238,11 +323,22 @@ const AdvisorDashboard = () => {
                   <div className="flex space-x-2 mt-3">
                     <Button
                       size="sm"
-                      onClick={() => setSelectedDoc(doc)}
+                      onClick={() => openDocumentDetails(doc)}
                       variant="outline"
                     >
-                      Review
+                      <Eye className="h-4 w-4 mr-1" />
+                      View & Review
                     </Button>
+                    {doc.file_url && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownloadDocument(doc)}
+                        variant="outline"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -254,12 +350,129 @@ const AdvisorDashboard = () => {
         </Card>
       </div>
 
-      {/* Review Modal */}
-      {selectedDoc && (
+      {/* Document Details Dialog */}
+      <Dialog open={!!viewingDocument} onOpenChange={() => setViewingDocument(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{viewingDocument?.title}</span>
+              <div className="flex space-x-2">
+                {viewingDocument?.file_url && (
+                  <Button
+                    size="sm"
+                    onClick={() => viewingDocument && handleDownloadDocument(viewingDocument)}
+                    variant="outline"
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                )}
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              {viewingDocument && getPhaseTitle(viewingDocument.phase)} - {viewingDocument?.project.title}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Document Info */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="text-sm text-gray-600 space-y-1">
+                <div><strong>Student:</strong> {viewingDocument?.project?.student?.full_name}</div>
+                <div><strong>Submitted:</strong> {viewingDocument?.submitted_at && new Date(viewingDocument.submitted_at).toLocaleString()}</div>
+                <div><strong>Status:</strong> <Badge className="ml-1 bg-yellow-100 text-yellow-800">Pending Review</Badge></div>
+              </div>
+            </div>
+
+            {/* Comments Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium flex items-center">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Communication Thread
+              </h4>
+              
+              <div className="space-y-3 max-h-60 overflow-y-auto border rounded-lg p-4">
+                {comments.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No comments yet. Start the conversation!</p>
+                ) : (
+                  comments.map((comment) => (
+                    <div key={comment.id} className="bg-white border rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-sm">
+                          {comment.profiles?.full_name || 'Unknown User'}
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {comment.profiles?.role || 'unknown'}
+                          </Badge>
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(comment.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">{comment.comment}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Comment */}
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Add a comment or provide feedback..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  rows={3}
+                />
+                <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Add Comment
+                </Button>
+              </div>
+            </div>
+
+            {/* Review Actions */}
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Document Review</h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Final Review Feedback
+                  </label>
+                  <Textarea
+                    value={feedback}
+                    onChange={(e) => setFeedback(e.target.value)}
+                    placeholder="Provide your final review feedback..."
+                    rows={3}
+                  />
+                </div>
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => viewingDocument && handleDocumentAction(viewingDocument.id, 'approved', feedback)}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve Document
+                  </Button>
+                  <Button
+                    onClick={() => viewingDocument && handleDocumentAction(viewingDocument.id, 'rejected', feedback)}
+                    variant="destructive"
+                    disabled={!feedback.trim()}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject Document
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Review Modal (keeping the original for backward compatibility) */}
+      {selectedDoc && !viewingDocument && (
         <Card className="fixed inset-x-4 top-20 z-50 max-w-2xl mx-auto bg-white border-2 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Review Document</span>
+              <span>Quick Review</span>
               <Button variant="ghost" size="sm" onClick={() => setSelectedDoc(null)}>
                 ×
               </Button>
