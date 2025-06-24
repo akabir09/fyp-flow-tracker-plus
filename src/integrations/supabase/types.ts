@@ -355,6 +355,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_project_officer: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_notification: {
         Args:
           | { user_id: string; title: string; message: string }
@@ -365,6 +369,10 @@ export type Database = {
               notification_type?: Database["public"]["Enums"]["notification_type"]
               target_role?: Database["public"]["Enums"]["user_role"]
             }
+        Returns: string
+      }
+      get_user_role: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       notify_role: {
