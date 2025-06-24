@@ -29,6 +29,7 @@ const PhaseChat = ({ projectId, phase }: PhaseChatProps) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,6 +38,15 @@ const PhaseChat = ({ projectId, phase }: PhaseChatProps) => {
   useEffect(() => {
     fetchMessages();
     subscribeToMessages();
+
+    // Cleanup function
+    return () => {
+      if (channelRef.current) {
+        console.log('Cleaning up channel subscription');
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [projectId, phase]);
 
   useEffect(() => {
@@ -66,8 +76,19 @@ const PhaseChat = ({ projectId, phase }: PhaseChatProps) => {
   };
 
   const subscribeToMessages = () => {
+    // Clean up existing channel if it exists
+    if (channelRef.current) {
+      console.log('Removing existing channel before creating new one');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Create new channel with unique name to avoid conflicts
+    const channelName = `phase-chat-${projectId}-${phase}-${Date.now()}`;
+    console.log('Creating new channel:', channelName);
+    
     const channel = supabase
-      .channel('phase-chat')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -77,6 +98,7 @@ const PhaseChat = ({ projectId, phase }: PhaseChatProps) => {
           filter: `project_id=eq.${projectId}`
         },
         async (payload) => {
+          console.log('Received new message:', payload);
           // Fetch the complete message with profile data
           const { data } = await supabase
             .from('phase_chat_messages')
@@ -92,11 +114,11 @@ const PhaseChat = ({ projectId, phase }: PhaseChatProps) => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Channel subscription status:', status);
+      });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    channelRef.current = channel;
   };
 
   const handleSendMessage = async () => {
