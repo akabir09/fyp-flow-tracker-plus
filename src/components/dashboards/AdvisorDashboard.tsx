@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, User, Eye } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, User, Eye, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import PhaseDetailView from './PhaseDetailView';
+import ProjectResources from '@/components/ProjectResources';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -45,6 +47,7 @@ const AdvisorDashboard = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<string>('');
   const [showPhaseDetail, setShowPhaseDetail] = useState(false);
+  const [showResourcesView, setShowResourcesView] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
   const [phaseSelectionDialogOpen, setPhaseSelectionDialogOpen] = useState(false);
@@ -234,6 +237,16 @@ const AdvisorDashboard = () => {
     setSelectedPhase('');
   };
 
+  const handleViewResources = (project: Project) => {
+    setSelectedProject(project);
+    setShowResourcesView(true);
+  };
+
+  const handleBackFromResources = () => {
+    setShowResourcesView(false);
+    setSelectedProject(null);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
@@ -284,6 +297,28 @@ const AdvisorDashboard = () => {
     );
   }
 
+  if (showResourcesView && selectedProject) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Button
+              variant="outline"
+              onClick={handleBackFromResources}
+              className="mb-4"
+            >
+              ← Back to Dashboard
+            </Button>
+            <h1 className="text-2xl font-bold">Project Resources</h1>
+            <p className="text-gray-600">{selectedProject.title}</p>
+          </div>
+        </div>
+        
+        <ProjectResources projectId={selectedProject.id} canUpload={false} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -326,6 +361,14 @@ const AdvisorDashboard = () => {
                   <Badge className="bg-blue-100 text-blue-800">
                     {project.status}
                   </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewResources(project)}
+                  >
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Resources
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

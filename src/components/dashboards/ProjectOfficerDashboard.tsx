@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,10 +11,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown, Eye } from 'lucide-react';
+import { Plus, Users, FileText, Calendar, BarChart3, X, Check, ChevronsUpDown, Eye, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ProjectDetailsView from './ProjectDetailsView';
+import ProjectResources from '@/components/ProjectResources';
 
 interface Project {
   id: string;
@@ -46,6 +46,7 @@ const ProjectOfficerDashboard = () => {
   const [advisors, setAdvisors] = useState<Profile[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [showResourcesView, setShowResourcesView] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
@@ -254,12 +255,39 @@ const ProjectOfficerDashboard = () => {
   }
 
   // Show project details view if a project is selected
-  if (selectedProjectId) {
+  if (selectedProjectId && !showResourcesView) {
     return (
       <ProjectDetailsView
         projectId={selectedProjectId}
         onBack={() => setSelectedProjectId(null)}
       />
+    );
+  }
+
+  // Show resources view if selected
+  if (selectedProjectId && showResourcesView) {
+    const selectedProject = projects.find(p => p.id === selectedProjectId);
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowResourcesView(false);
+                setSelectedProjectId(null);
+              }}
+              className="mb-4"
+            >
+              ← Back to Dashboard
+            </Button>
+            <h1 className="text-2xl font-bold">Project Resources</h1>
+            <p className="text-gray-600">{selectedProject?.title}</p>
+          </div>
+        </div>
+        
+        <ProjectResources projectId={selectedProjectId} canUpload={true} />
+      </div>
     );
   }
 
@@ -559,6 +587,17 @@ const ProjectOfficerDashboard = () => {
                     }>
                       {project.status}
                     </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedProjectId(project.id);
+                        setShowResourcesView(true);
+                      }}
+                    >
+                      <Upload className="h-4 w-4 mr-1" />
+                      Resources
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
