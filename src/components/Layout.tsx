@@ -196,26 +196,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         {children}
         
         {/* Comments Section */}
-        <div className="mt-12">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MessageSquare className="h-5 w-5" />
-                <span>General Comments</span>
-              </CardTitle>
-            </CardHeader>
-            
-                
-                {comments.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-2">No comments yet</p>
-                    <p className="text-sm">Start the conversation!</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Comment Input */}
+        
             
           </Card>
         </div>
