@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye, Download, Users } from 'lucide-react';
+import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye, Download, Users, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 import PhaseChat from '@/components/PhaseChat';
@@ -76,7 +77,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
       case 'rejected':
         return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending Review</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800">Under Review</Badge>;
     }
   };
 
@@ -166,7 +167,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
         throw new Error('Failed to upload file');
       }
 
-      // Insert document record with file URL
+      // Insert document record with file URL - documents start as 'pending' by default
       const { error } = await supabase
         .from('documents')
         .insert({
@@ -174,13 +175,13 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
           phase: phase as PhaseType,
           title: documentTitle,
           submitted_by: profile?.id,
-          status: 'pending',
+          status: 'pending', // This makes it immediately visible to advisors for review
           file_url: fileUrl
         });
 
       if (error) throw error;
 
-      toast.success('Document uploaded successfully');
+      toast.success('Document uploaded and submitted for review successfully');
       setUploadDialogOpen(false);
       setDocumentTitle('');
       setDocumentFile(null);
@@ -214,24 +215,6 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     }
   };
 
-  const handleRequestReview = async (documentId: string) => {
-    try {
-      // Update document status to pending and add notification for advisor
-      const { error } = await supabase
-        .from('documents')
-        .update({ status: 'pending' })
-        .eq('id', documentId);
-
-      if (error) throw error;
-
-      toast.success('Review requested successfully');
-      fetchDocuments();
-    } catch (error) {
-      console.error('Error requesting review:', error);
-      toast.error('Failed to request review');
-    }
-  };
-
   const handleAddComment = async () => {
     if (!newComment.trim() || !selectedDocument) return;
 
@@ -255,6 +238,55 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
     }
   };
 
+  const handleApproveDocument = async (documentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ 
+          status: 'approved',
+          reviewed_by: profile?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (error) throw error;
+
+      toast.success('Document approved successfully');
+      fetchDocuments();
+      if (selectedDocument?.id === documentId) {
+        setSelectedDocument(null);
+      }
+    } catch (error) {
+      console.error('Error approving document:', error);
+      toast.error('Failed to approve document');
+    }
+  };
+
+  const handleRejectDocument = async (documentId: string, feedback: string) => {
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ 
+          status: 'rejected',
+          advisor_feedback: feedback,
+          reviewed_by: profile?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', documentId);
+
+      if (error) throw error;
+
+      toast.success('Document rejected with feedback');
+      fetchDocuments();
+      if (selectedDocument?.id === documentId) {
+        setSelectedDocument(null);
+      }
+    } catch (error) {
+      console.error('Error rejecting document:', error);
+      toast.error('Failed to reject document');
+    }
+  };
+
   const openDocumentDetails = (document: Document) => {
     setSelectedDocument(document);
     fetchComments(document.id);
@@ -263,6 +295,9 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
   if (loading) {
     return <div className="animate-pulse space-y-4">Loading...</div>;
   }
+
+  const canUploadDocuments = profile?.role === 'student' && !isLocked;
+  const canReviewDocuments = profile?.role === 'advisor' || profile?.role === 'project_officer';
 
   return (
     <div className="space-y-6">
@@ -282,7 +317,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
             )}
           </div>
         </div>
-        {!isLocked && (
+        {canUploadDocuments && (
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -294,7 +329,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
               <DialogHeader>
                 <DialogTitle>Upload Document</DialogTitle>
                 <DialogDescription>
-                  Upload a document for {getPhaseTitle(phase)}
+                  Upload a document for {getPhaseTitle(phase)}. It will be automatically submitted for review.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -322,7 +357,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                   Cancel
                 </Button>
                 <Button onClick={handleUploadDocument} disabled={uploading}>
-                  {uploading ? 'Uploading...' : 'Upload'}
+                  {uploading ? 'Uploading...' : 'Upload & Submit for Review'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -351,7 +386,12 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                 <CardContent className="text-center py-12">
                   <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents</h3>
-                  <p className="text-gray-600">No documents have been uploaded for this phase yet.</p>
+                  <p className="text-gray-600">
+                    {profile?.role === 'student' 
+                      ? "No documents have been uploaded for this phase yet."
+                      : "No documents have been submitted for review in this phase yet."
+                    }
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -371,7 +411,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
-                      <div className="space-y-2">
+                      <div className="space-y-2 flex-1">
                         {document.status === 'rejected' && document.advisor_feedback && (
                           <div className="bg-red-50 border border-red-200 rounded p-3">
                             <p className="text-sm font-medium text-red-800">Advisor Feedback:</p>
@@ -379,7 +419,7 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                           </div>
                         )}
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 ml-4">
                         {document.file_url && (
                           <Button
                             variant="outline"
@@ -398,13 +438,28 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
-                        {document.status !== 'approved' && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleRequestReview(document.id)}
-                          >
-                            Request Review
-                          </Button>
+                        {canReviewDocuments && document.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApproveDocument(document.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                const feedback = prompt('Please provide feedback for rejection:');
+                                if (feedback) {
+                                  handleRejectDocument(document.id, feedback);
+                                }
+                              }}
+                            >
+                              Reject
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
