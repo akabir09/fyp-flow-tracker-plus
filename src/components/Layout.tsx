@@ -198,8 +198,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         {/* Comments Section */}
         
             
-          </Card>
-        </div>
+          
       </main>
     </div>
   );
