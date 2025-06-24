@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, User } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, MessageSquare, Download, User, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import PhaseDetailView from './PhaseDetailView';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -41,11 +42,22 @@ const AdvisorDashboard = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedPhase, setSelectedPhase] = useState<string>('');
+  const [showPhaseDetail, setShowPhaseDetail] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [commentsDialogOpen, setCommentsDialogOpen] = useState(false);
+  const [phaseSelectionDialogOpen, setPhaseSelectionDialogOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const phases = [
+    { id: 'phase1', title: 'Phase 1: Project Proposal' },
+    { id: 'phase2', title: 'Phase 2: Literature Review' },
+    { id: 'phase3', title: 'Phase 3: Implementation' },
+    { id: 'phase4', title: 'Phase 4: Final Report' }
+  ];
 
   useEffect(() => {
     if (profile) {
@@ -193,6 +205,23 @@ const AdvisorDashboard = () => {
     fetchComments(document.id);
   };
 
+  const handleViewProject = (project: Project) => {
+    setSelectedProject(project);
+    setPhaseSelectionDialogOpen(true);
+  };
+
+  const handlePhaseSelect = (phaseId: string) => {
+    setSelectedPhase(phaseId);
+    setPhaseSelectionDialogOpen(false);
+    setShowPhaseDetail(true);
+  };
+
+  const handleBackToDashboard = () => {
+    setShowPhaseDetail(false);
+    setSelectedProject(null);
+    setSelectedPhase('');
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
@@ -232,6 +261,17 @@ const AdvisorDashboard = () => {
     return <div className="animate-pulse space-y-4">Loading...</div>;
   }
 
+  if (showPhaseDetail && selectedProject) {
+    return (
+      <PhaseDetailView
+        phase={selectedPhase}
+        projectId={selectedProject.id}
+        onBack={handleBackToDashboard}
+        isLocked={false}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -258,9 +298,19 @@ const AdvisorDashboard = () => {
                     Student: {project.student?.full_name} ({project.student?.email})
                   </p>
                 </div>
-                <Badge className="bg-blue-100 text-blue-800">
-                  {project.status}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge className="bg-blue-100 text-blue-800">
+                    {project.status}
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewProject(project)}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -389,6 +439,37 @@ const AdvisorDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Phase Selection Dialog */}
+      <Dialog open={phaseSelectionDialogOpen} onOpenChange={setPhaseSelectionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Phase</DialogTitle>
+            <DialogDescription>
+              Choose a phase to view documents and chat for {selectedProject?.title}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            {phases.map((phase) => (
+              <Button
+                key={phase.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => handlePhaseSelect(phase.id)}
+              >
+                {phase.title}
+              </Button>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPhaseSelectionDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
