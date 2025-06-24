@@ -18,10 +18,10 @@ interface Project {
   title: string;
   description: string;
   status: string;
-  student: {
+  students: {
     full_name: string;
     email: string;
-  } | null;
+  }[];
 }
 
 interface Comment {
@@ -72,12 +72,24 @@ const AdvisorDashboard = () => {
         .from('fyp_projects')
         .select(`
           *,
-          student:profiles!student_id(full_name, email)
+          project_students(
+            student:profiles!student_id(full_name, email)
+          )
         `)
         .eq('advisor_id', profile?.id);
 
       if (projectError) throw projectError;
-      setProjects(projectData || []);
+      
+      // Transform the data to match our interface
+      const transformedProjects = projectData?.map(project => ({
+        id: project.id,
+        title: project.title,
+        description: project.description,
+        status: project.status,
+        students: project.project_students?.map(ps => ps.student).filter(Boolean) || []
+      })) || [];
+      
+      setProjects(transformedProjects);
 
       if (projectData && projectData.length > 0) {
         const projectIds = projectData.map(p => p.id);
@@ -294,9 +306,21 @@ const AdvisorDashboard = () => {
               <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <h3 className="font-medium">{project.title}</h3>
-                  <p className="text-sm text-gray-600">
-                    Student: {project.student?.full_name} ({project.student?.email})
-                  </p>
+                  <div className="text-sm text-gray-600">
+                    {project.students.length > 0 ? (
+                      <div>
+                        <span className="font-medium">Students: </span>
+                        {project.students.map((student, index) => (
+                          <span key={index}>
+                            {student.full_name} ({student.email})
+                            {index < project.students.length - 1 ? ', ' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>No students assigned</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge className="bg-blue-100 text-blue-800">
@@ -340,7 +364,7 @@ const AdvisorDashboard = () => {
                         <div>
                           <h4 className="font-medium text-sm">{document.title}</h4>
                           <p className="text-xs text-gray-600">
-                            {getPhaseTitle(document.phase)} • {project?.student?.full_name}
+                            {getPhaseTitle(document.phase)} • {project?.students.map(s => s.full_name).join(', ') || 'No students'}
                           </p>
                           <p className="text-xs text-gray-500">
                             Submitted: {document.submitted_at && new Date(document.submitted_at).toLocaleDateString()}
@@ -398,7 +422,7 @@ const AdvisorDashboard = () => {
                       <div>
                         <h4 className="font-medium text-sm">{document.title}</h4>
                         <p className="text-xs text-gray-600">
-                          {getPhaseTitle(document.phase)} • {project?.student?.full_name}
+                          {getPhaseTitle(document.phase)} • {project?.students.map(s => s.full_name).join(', ') || 'No students'}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
