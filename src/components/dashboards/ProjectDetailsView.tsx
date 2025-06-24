@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +57,7 @@ interface Comment {
   comment: string;
   created_at: string;
   user: {
+    id: string;
     full_name: string;
     email: string;
     role: string;
@@ -160,12 +162,12 @@ const ProjectDetailsView = ({ projectId, onBack }: ProjectDetailsViewProps) => {
 
       setDocuments(documentsData || []);
 
-      // Fetch comments
+      // Fetch comments with user id included
       const { data: commentsData } = await supabase
         .from('document_comments')
         .select(`
           *,
-          user:profiles!user_id(full_name, email, role),
+          user:profiles!user_id(id, full_name, email, role),
           document:documents!document_id(title, phase)
         `)
         .eq('documents.project_id', projectId)
