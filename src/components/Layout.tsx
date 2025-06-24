@@ -2,11 +2,86 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, User, FileText, Users, Settings } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Bell, LogOut, User, FileText, Users, Settings, MessageSquare, Send, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+
+interface GeneralComment {
+  id: string;
+  comment: string;
+  created_at: string;
+  user: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+  };
+}
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { profile, signOut } = useAuth();
+  const [comments, setComments] = useState<GeneralComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
+    }
+  }, [showComments]);
+
+  const fetchComments = async () => {
+    try {
+      const { data: commentsData } = await supabase
+        .from('document_comments')
+        .select(`
+          *,
+          user:profiles!user_id(id, full_name, email, role)
+        `)
+        .is('document_id', null)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      setComments(commentsData || []);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!newComment.trim() || !profile) {
+      toast.error('Please enter a comment');
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    try {
+      const { error } = await supabase
+        .from('document_comments')
+        .insert({
+          comment: newComment.trim(),
+          user_id: profile.id,
+          document_id: null
+        });
+
+      if (error) throw error;
+
+      setNewComment('');
+      toast.success('Comment added successfully');
+      fetchComments();
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      toast.error('Failed to submit comment');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,6 +114,49 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const getUserInitials = (fullName: string) => {
+    return fullName
+      .split(' ')
+      .map(name => name.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getAvatarColor = (role: string) => {
+    switch (role) {
+      case 'student':
+        return 'bg-blue-500';
+      case 'advisor':
+        return 'bg-green-500';
+      case 'project_officer':
+        return 'bg-purple-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const getMessageAlignment = (userId: string) => {
+    return userId === profile?.id ? 'flex-row-reverse' : 'flex-row';
+  };
+
+  const getMessageBgColor = (userId: string, role: string) => {
+    if (userId === profile?.id) {
+      return 'bg-blue-500 text-white';
+    }
+    
+    switch (role) {
+      case 'advisor':
+        return 'bg-green-100 text-green-800';
+      case 'project_officer':
+        return 'bg-purple-100 text-purple-800';
+      case 'student':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
@@ -66,6 +184,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 </>
               )}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowComments(!showComments)}
+              >
+                <MessageSquare className="h-4 w-4" />
+              </Button>
               <Button variant="ghost" size="sm">
                 <Bell className="h-4 w-4" />
               </Button>
@@ -81,6 +206,111 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Comments Section */}
+      {showComments && (
+        <div className="fixed bottom-0 right-0 w-96 h-96 bg-white border-l border-t shadow-lg z-40">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex-shrink-0 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center space-x-2 text-lg">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>General Comments</span>
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowComments(false)}
+                >
+                  ×
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-4 pt-0">
+              {/* Comments Display */}
+              <div className="flex-1 space-y-3 mb-4 overflow-y-auto">
+                {comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className={`flex items-start space-x-2 ${getMessageAlignment(comment.user.id)}`}
+                  >
+                    <Avatar className="w-7 h-7 flex-shrink-0">
+                      <AvatarFallback className={`text-white text-xs ${getAvatarColor(comment.user.role)}`}>
+                        {getUserInitials(comment.user.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className={`max-w-xs ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
+                      <div className={`rounded-lg px-3 py-2 text-sm ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
+                        <div className="flex items-center space-x-1 mb-1">
+                          <span className="font-medium text-xs">
+                            {comment.user.full_name}
+                          </span>
+                          <Badge variant="outline" className="text-xs px-1 py-0">
+                            {comment.user.role}
+                          </Badge>
+                        </div>
+                        <p className="break-words">{comment.comment}</p>
+                        <div className="flex items-center space-x-1 mt-1 text-xs opacity-70">
+                          <Calendar className="h-3 w-3" />
+                          <span>{format(new Date(comment.created_at), 'MMM dd, HH:mm')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {comments.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No comments yet. Start the conversation!</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Comment Input */}
+              <div className="border-t pt-3">
+                <div className="flex items-start space-x-2">
+                  <Avatar className="w-7 h-7 flex-shrink-0">
+                    <AvatarFallback className={`text-white text-xs ${getAvatarColor(profile?.role || 'student')}`}>
+                      {profile ? getUserInitials(profile.full_name || 'User') : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="min-h-[60px] resize-none text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          submitComment();
+                        }
+                      }}
+                    />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500">
+                        Ctrl+Enter to send
+                      </span>
+                      <Button
+                        onClick={submitComment}
+                        disabled={isSubmittingComment || !newComment.trim()}
+                        size="sm"
+                      >
+                        <Send className="h-3 w-3 mr-1" />
+                        {isSubmittingComment ? 'Sending...' : 'Send'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
