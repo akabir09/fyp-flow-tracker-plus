@@ -13,7 +13,7 @@ export type Database = {
         Row: {
           comment: string
           created_at: string
-          document_id: string | null
+          document_id: string
           id: string
           updated_at: string
           user_id: string
@@ -21,7 +21,7 @@ export type Database = {
         Insert: {
           comment: string
           created_at?: string
-          document_id?: string | null
+          document_id: string
           id?: string
           updated_at?: string
           user_id: string
@@ -29,7 +29,7 @@ export type Database = {
         Update: {
           comment?: string
           created_at?: string
-          document_id?: string | null
+          document_id?: string
           id?: string
           updated_at?: string
           user_id?: string

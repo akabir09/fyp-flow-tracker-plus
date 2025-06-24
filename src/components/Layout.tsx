@@ -144,13 +144,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     
     switch (role) {
       case 'advisor':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800';
       case 'project_officer':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-purple-100 text-purple-800';
       case 'student':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -197,82 +197,95 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         {children}
         
         {/* Comments Section */}
-        <div className="mt-12 border-t border-gray-200 pt-8">
-          <Card className="w-full">
+        <div className="mt-12">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <MessageSquare className="h-5 w-5" />
-                <span>General Discussion</span>
+                <span>General Comments</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Comment Input */}
-              <div className="flex space-x-3">
-                <Avatar>
-                  <AvatarFallback className={`${getAvatarColor(profile?.role || '')} text-white`}>
-                    {profile?.full_name ? getUserInitials(profile.full_name) : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-2">
-                  <Textarea
-                    placeholder="Add a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-[80px] resize-none"
-                  />
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={submitComment}
-                      disabled={isSubmittingComment || !newComment.trim()}
-                      size="sm"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      {isSubmittingComment ? 'Posting...' : 'Post Comment'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Comments List */}
+              {/* Comments Display */}
               <div className="space-y-4 max-h-96 overflow-y-auto">
-                {comments.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No comments yet. Start the conversation!</p>
-                  </div>
-                ) : (
-                  comments.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className={`flex space-x-3 ${getMessageAlignment(comment.user.id)}`}
-                    >
-                      <Avatar className={comment.user.id === profile?.id ? 'order-last' : ''}>
-                        <AvatarFallback className={`${getAvatarColor(comment.user.role)} text-white`}>
-                          {getUserInitials(comment.user.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className={`flex-1 max-w-xs ${comment.user.id === profile?.id ? 'text-right' : 'text-left'}`}>
-                        <div className={`inline-block p-3 rounded-lg border ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-sm font-medium">
-                              {comment.user.full_name}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {getRoleLabel(comment.user.role)}
-                            </Badge>
-                          </div>
-                          <p className="text-sm leading-relaxed">{comment.comment}</p>
-                          <div className="flex items-center space-x-1 mt-2">
-                            <Calendar className="h-3 w-3 opacity-50" />
-                            <span className="text-xs opacity-75">
-                              {format(new Date(comment.created_at), 'MMM d, yyyy h:mm a')}
-                            </span>
-                          </div>
+                {comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className={`flex items-start space-x-3 ${getMessageAlignment(comment.user.id)}`}
+                  >
+                    <Avatar className="w-8 h-8 flex-shrink-0">
+                      <AvatarFallback className={`text-white text-sm ${getAvatarColor(comment.user.role)}`}>
+                        {getUserInitials(comment.user.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className={`max-w-md ${comment.user.id === profile?.id ? 'ml-auto' : 'mr-auto'}`}>
+                      <div className={`rounded-lg px-4 py-3 ${getMessageBgColor(comment.user.id, comment.user.role)}`}>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="font-medium text-sm">
+                            {comment.user.full_name}
+                          </span>
+                          <Badge variant="outline" className="text-xs px-2 py-0">
+                            {getRoleLabel(comment.user.role)}
+                          </Badge>
+                        </div>
+                        <p className="break-words text-sm">{comment.comment}</p>
+                        <div className="flex items-center space-x-1 mt-2 text-xs opacity-75">
+                          <Calendar className="h-3 w-3" />
+                          <span>{format(new Date(comment.created_at), 'MMM dd, HH:mm')}</span>
                         </div>
                       </div>
                     </div>
-                  ))
+                  </div>
+                ))}
+                
+                {comments.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium mb-2">No comments yet</p>
+                    <p className="text-sm">Start the conversation!</p>
+                  </div>
                 )}
+              </div>
+
+              {/* Comment Input */}
+              <div className="border-t pt-6">
+                <div className="flex items-start space-x-3">
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarFallback className={`text-white text-sm ${getAvatarColor(profile?.role || 'student')}`}>
+                      {profile ? getUserInitials(profile.full_name || 'User') : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 space-y-3">
+                    <Textarea
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="min-h-[80px] resize-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          submitComment();
+                        }
+                      }}
+                    />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">
+                        Ctrl+Enter to send
+                      </span>
+                      <Button
+                        onClick={submitComment}
+                        disabled={isSubmittingComment || !newComment.trim()}
+                        size="sm"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        {isSubmittingComment ? 'Sending...' : 'Send'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
