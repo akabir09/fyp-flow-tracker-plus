@@ -22,10 +22,10 @@ interface Project {
   title: string;
   description: string;
   status: string;
-  student: {
+  students: Array<{
     full_name: string;
     email: string;
-  } | null;
+  }>;
   advisor: {
     full_name: string;
     email: string;
@@ -67,17 +67,25 @@ const ProjectOfficerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch all projects
+      // Fetch all projects with their associated students
       const { data: projectsData } = await supabase
         .from('fyp_projects')
         .select(`
           *,
-          student:profiles!student_id(full_name, email),
-          advisor:profiles!advisor_id(full_name, email)
+          advisor:profiles!advisor_id(full_name, email),
+          project_students(
+            student:profiles!student_id(full_name, email)
+          )
         `)
         .order('created_at', { ascending: false });
 
-      setProjects(projectsData || []);
+      // Transform the data to match our interface
+      const transformedProjects = projectsData?.map(project => ({
+        ...project,
+        students: project.project_students?.map(ps => ps.student).filter(Boolean) || []
+      })) || [];
+
+      setProjects(transformedProjects);
 
       // Fetch students
       const { data: studentsData } = await supabase
@@ -151,52 +159,59 @@ const ProjectOfficerDashboard = () => {
     }
     
     try {
-      // Create projects for each selected student
-      const projectPromises = formData.studentIds.map(async (studentId) => {
-        const { data, error } = await supabase
-          .from('fyp_projects')
+      // Create a single project
+      const { data: projectData, error: projectError } = await supabase
+        .from('fyp_projects')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          advisor_id: formData.advisorId || null,
+          project_officer_id: profile?.id
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      // Associate all selected students with the project
+      const studentAssociations = formData.studentIds.map(studentId => ({
+        project_id: projectData.id,
+        student_id: studentId
+      }));
+
+      const { error: studentsError } = await supabase
+        .from('project_students')
+        .insert(studentAssociations);
+
+      if (studentsError) throw studentsError;
+
+      // Create phase deadlines for the project
+      const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
+      const deadlines = [
+        formData.phase1Deadline,
+        formData.phase2Deadline,
+        formData.phase3Deadline,
+        formData.phase4Deadline
+      ];
+      
+      for (let i = 0; i < phases.length; i++) {
+        await supabase
+          .from('phase_deadlines')
           .insert({
-            title: formData.title,
-            description: formData.description,
-            student_id: studentId,
-            advisor_id: formData.advisorId || null,
-            project_officer_id: profile?.id
-          })
-          .select()
-          .single();
+            project_id: projectData.id,
+            phase: phases[i],
+            deadline_date: deadlines[i]
+          });
+      }
 
-        if (error) throw error;
-
-        // Create phase deadlines for each project
-        const phases: ('phase1' | 'phase2' | 'phase3' | 'phase4')[] = ['phase1', 'phase2', 'phase3', 'phase4'];
-        const deadlines = [
-          formData.phase1Deadline,
-          formData.phase2Deadline,
-          formData.phase3Deadline,
-          formData.phase4Deadline
-        ];
-        
-        for (let i = 0; i < phases.length; i++) {
-          await supabase
-            .from('phase_deadlines')
-            .insert({
-              project_id: data.id,
-              phase: phases[i],
-              deadline_date: deadlines[i]
-            });
-        }
-
-        // Create notification for student
+      // Create notifications for all students
+      for (const studentId of formData.studentIds) {
         await supabase.rpc('create_notification', {
           user_id: studentId,
           title: 'New Project Assigned',
           message: `You have been assigned to project: ${formData.title}`
         });
-
-        return data;
-      });
-
-      await Promise.all(projectPromises);
+      }
 
       // Create notification for advisor if assigned
       if (formData.advisorId) {
@@ -207,7 +222,7 @@ const ProjectOfficerDashboard = () => {
         });
       }
 
-      toast.success(`Project created successfully for ${formData.studentIds.length} students`);
+      toast.success(`Project created successfully with ${formData.studentIds.length} students`);
       setShowCreateForm(false);
       setFormData({ 
         title: '', 
@@ -325,7 +340,7 @@ const ProjectOfficerDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Create New FYP Project</CardTitle>
-            <CardDescription>Assign a new Final Year Project to students and advisor (Select 2-4 students)</CardDescription>
+            <CardDescription>Create a new Final Year Project and assign multiple students (2-4 students)</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateProject} className="space-y-6">
@@ -556,11 +571,19 @@ const ProjectOfficerDashboard = () => {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium text-gray-700">Student:</span>
-                    <span className="text-gray-600">
-                      {project.student ? `${project.student.full_name} (${project.student.email})` : 'Not assigned'}
-                    </span>
+                  <div className="flex flex-col space-y-1">
+                    <span className="font-medium text-gray-700">Students ({project.students.length}):</span>
+                    <div className="text-gray-600">
+                      {project.students.length > 0 ? (
+                        project.students.map((student, index) => (
+                          <div key={index} className="text-xs">
+                            {student.full_name} ({student.email})
+                          </div>
+                        ))
+                      ) : (
+                        'No students assigned'
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span className="font-medium text-gray-700">Advisor:</span>

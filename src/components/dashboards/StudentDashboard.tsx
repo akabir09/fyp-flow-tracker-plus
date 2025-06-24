@@ -44,24 +44,26 @@ const StudentDashboard = () => {
 
   const fetchStudentData = async () => {
     try {
-      // Fetch student's project
-      const { data: projectData, error: projectError } = await supabase
-        .from('fyp_projects')
+      // Fetch student's project through the project_students junction table
+      const { data: projectStudentData, error: projectError } = await supabase
+        .from('project_students')
         .select(`
-          *,
-          advisor:profiles!advisor_id(full_name, email)
+          project:fyp_projects(
+            *,
+            advisor:profiles!advisor_id(full_name, email)
+          )
         `)
         .eq('student_id', profile?.id)
         .single();
 
-      if (projectData) {
-        setProject(projectData);
+      if (projectStudentData?.project) {
+        setProject(projectStudentData.project);
 
         // Fetch documents for this project
         const { data: docsData } = await supabase
           .from('documents')
           .select('*')
-          .eq('project_id', projectData.id)
+          .eq('project_id', projectStudentData.project.id)
           .order('submitted_at', { ascending: false });
 
         setDocuments(docsData || []);
@@ -70,7 +72,7 @@ const StudentDashboard = () => {
         const { data: deadlinesData } = await supabase
           .from('phase_deadlines')
           .select('*')
-          .eq('project_id', projectData.id)
+          .eq('project_id', projectStudentData.project.id)
           .order('phase');
 
         setDeadlines(deadlinesData || []);

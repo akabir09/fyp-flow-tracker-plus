@@ -123,7 +123,6 @@ export type Database = {
           id: string
           project_officer_id: string | null
           status: Database["public"]["Enums"]["project_status"] | null
-          student_id: string | null
           title: string
           updated_at: string | null
         }
@@ -134,7 +133,6 @@ export type Database = {
           id?: string
           project_officer_id?: string | null
           status?: Database["public"]["Enums"]["project_status"] | null
-          student_id?: string | null
           title: string
           updated_at?: string | null
         }
@@ -145,7 +143,6 @@ export type Database = {
           id?: string
           project_officer_id?: string | null
           status?: Database["public"]["Enums"]["project_status"] | null
-          student_id?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -160,13 +157,6 @@ export type Database = {
           {
             foreignKeyName: "fyp_projects_project_officer_id_fkey"
             columns: ["project_officer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fyp_projects_student_id_fkey"
-            columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -324,6 +314,42 @@ export type Database = {
         }
         Relationships: []
       }
+      project_students: {
+        Row: {
+          created_at: string | null
+          id: string
+          project_id: string | null
+          student_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          student_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_students_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fyp_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -349,6 +375,10 @@ export type Database = {
           notification_type?: Database["public"]["Enums"]["notification_type"]
         }
         Returns: number
+      }
+      user_has_project_access: {
+        Args: { project_id: string }
+        Returns: boolean
       }
     }
     Enums: {
