@@ -13,7 +13,7 @@ export type Database = {
         Row: {
           comment: string
           created_at: string
-          document_id: string
+          document_id: string | null
           id: string
           updated_at: string
           user_id: string
@@ -21,7 +21,7 @@ export type Database = {
         Insert: {
           comment: string
           created_at?: string
-          document_id: string
+          document_id?: string | null
           id?: string
           updated_at?: string
           user_id: string
@@ -29,7 +29,7 @@ export type Database = {
         Update: {
           comment?: string
           created_at?: string
-          document_id?: string
+          document_id?: string | null
           id?: string
           updated_at?: string
           user_id?: string
@@ -213,6 +213,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phase_chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          phase: string
+          project_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          phase: string
+          project_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          phase?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_chat_messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "fyp_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase_chat_messages_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

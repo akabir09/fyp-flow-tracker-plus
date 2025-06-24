@@ -8,9 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye, Download } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, FileText, MessageSquare, ArrowLeft, CheckCircle, AlertCircle, Clock, Eye, Download, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import PhaseChat from '@/components/PhaseChat';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 type PhaseType = Database['public']['Enums']['fyp_phase'];
@@ -328,75 +330,95 @@ const PhaseDetailView = ({ phase, projectId, onBack, isLocked }: PhaseDetailView
         )}
       </div>
 
-      {/* Documents List */}
-      <div className="grid grid-cols-1 gap-4">
-        {documents.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents</h3>
-              <p className="text-gray-600">No documents have been uploaded for this phase yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          documents.map((document) => (
-            <Card key={document.id}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{document.title}</CardTitle>
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(document.status || 'pending')}
-                    {getStatusBadge(document.status || 'pending')}
-                  </div>
-                </div>
-                <CardDescription>
-                  Submitted on {document.submitted_at ? new Date(document.submitted_at).toLocaleDateString() : 'Unknown'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    {document.status === 'rejected' && document.advisor_feedback && (
-                      <div className="bg-red-50 border border-red-200 rounded p-3">
-                        <p className="text-sm font-medium text-red-800">Advisor Feedback:</p>
-                        <p className="text-sm text-red-700 mt-1">{document.advisor_feedback}</p>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="documents" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="documents" className="flex items-center space-x-2">
+            <FileText className="h-4 w-4" />
+            <span>Documents</span>
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="flex items-center space-x-2">
+            <Users className="h-4 w-4" />
+            <span>Discussion</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="documents" className="space-y-4">
+          {/* Documents List */}
+          <div className="grid grid-cols-1 gap-4">
+            {documents.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Documents</h3>
+                  <p className="text-gray-600">No documents have been uploaded for this phase yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              documents.map((document) => (
+                <Card key={document.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{document.title}</CardTitle>
+                      <div className="flex items-center space-x-2">
+                        {getStatusIcon(document.status || 'pending')}
+                        {getStatusBadge(document.status || 'pending')}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex space-x-2">
-                    {document.file_url && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadDocument(document)}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openDocumentDetails(document)}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </Button>
-                    {document.status !== 'approved' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleRequestReview(document.id)}
-                      >
-                        Request Review
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                    </div>
+                    <CardDescription>
+                      Submitted on {document.submitted_at ? new Date(document.submitted_at).toLocaleDateString() : 'Unknown'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        {document.status === 'rejected' && document.advisor_feedback && (
+                          <div className="bg-red-50 border border-red-200 rounded p-3">
+                            <p className="text-sm font-medium text-red-800">Advisor Feedback:</p>
+                            <p className="text-sm text-red-700 mt-1">{document.advisor_feedback}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        {document.file_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadDocument(document)}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openDocumentDetails(document)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                        {document.status !== 'approved' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleRequestReview(document.id)}
+                          >
+                            Request Review
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="chat">
+          <PhaseChat projectId={projectId} phase={phase} />
+        </TabsContent>
+      </Tabs>
 
       {/* Document Details Dialog */}
       <Dialog open={!!selectedDocument} onOpenChange={() => setSelectedDocument(null)}>
