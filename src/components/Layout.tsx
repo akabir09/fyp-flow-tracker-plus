@@ -2,8 +2,9 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, User, FileText, Users, Settings } from 'lucide-react';
+import { Bell, LogOut, User, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import Chatbot from './Chatbot';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { profile, signOut } = useAuth();
@@ -81,6 +82,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+
+      {/* Chatbot */}
+      <Chatbot />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import Chatbot from '@/components/Chatbot';
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -135,6 +136,9 @@ const Auth = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Chatbot */}
+      <Chatbot />
     </div>
   );
 };
