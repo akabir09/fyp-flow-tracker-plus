@@ -2,9 +2,10 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, LogOut, User, FileText } from 'lucide-react';
+import { LogOut, User, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import Chatbot from './Chatbot';
+import NotificationDropdown from './NotificationDropdown';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { profile, signOut } = useAuth();
@@ -67,9 +68,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 </>
               )}
-              <Button variant="ghost" size="sm">
-                <Bell className="h-4 w-4" />
-              </Button>
+              <NotificationDropdown />
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4" />
               </Button>
