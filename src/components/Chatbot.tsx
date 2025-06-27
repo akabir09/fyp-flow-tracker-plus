@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageCircle, Send, X, Bot, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Message {
   id: string;
@@ -44,6 +44,7 @@ const AnimatedText = ({ text, onComplete }: { text: string; onComplete?: () => v
 };
 
 const Chatbot = ({ className = '' }: ChatbotProps) => {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -134,6 +135,11 @@ const Chatbot = ({ className = '' }: ChatbotProps) => {
       handleSendMessage();
     }
   };
+
+  // Don't render chatbot if user is not authenticated
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
