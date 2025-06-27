@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageCircle, Send, X, Bot, User } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
@@ -17,16 +18,11 @@ interface ChatbotProps {
   className?: string;
 }
 
-const dummyResponses = [
-  "Hello! I'm here to help you with your FYP project. What would you like to know?",
-  "That's a great question! Based on my analysis, I would suggest reviewing the project guidelines first.",
-  "I can help you with project planning, documentation requirements, and submission deadlines.",
-  "For technical issues, please make sure you've followed the proper format guidelines in your documentation.",
-  "Your project seems to be progressing well! Keep up the good work and don't hesitate to ask if you need guidance.",
-  "I recommend checking with your advisor for specific feedback on this topic.",
-  "That's an interesting approach! Have you considered the implementation challenges?",
-  "Make sure to document all your progress and keep regular backups of your work."
-];
+interface ApiResponse {
+  matched_question: string;
+  answer: string;
+  similarity_score: number;
+}
 
 const AnimatedText = ({ text, onComplete }: { text: string; onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -85,22 +81,52 @@ const Chatbot = ({ className = '' }: ChatbotProps) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentQuery = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate bot response delay
-    setTimeout(() => {
-      const randomResponse = dummyResponses[Math.floor(Math.random() * dummyResponses.length)];
+    try {
+      const response = await fetch('http://192.168.1.14:8000/query/', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: currentQuery
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from API');
+      }
+
+      const data: ApiResponse = await response.json();
+      
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: randomResponse,
+        text: data.answer,
         isBot: true,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error calling chatbot API:', error);
+      toast.error('Failed to get response. Please try again.');
+      
+      // Fallback message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm sorry, I'm having trouble connecting to the server right now. Please try again later.",
+        isBot: true,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000 + Math.random() * 2000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -153,7 +179,7 @@ const Chatbot = ({ className = '' }: ChatbotProps) => {
                     >
                       <div className="flex items-start space-x-2">
                         {message.isBot && <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" />}
-                        {message.isBot && <User className="h-4 w-4 mt-0.5 flex-shrink-0" />}
+                        {!message.isBot && <User className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                         <div className="text-sm">
                           {message.isBot && index === messages.length - 1 && !isTyping ? (
                             <AnimatedText text={message.text} />
